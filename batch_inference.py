@@ -5,13 +5,14 @@ import sys
 
 def main():
     # 基础配置 / Basic Config
-    INPUT_DIR = Path("inputs")
-    OUTPUT_DIR = Path("results")
+    project_dir = Path(__file__).resolve().parent
+    INPUT_DIR = project_dir / "inputs"
+    OUTPUT_DIR = project_dir / "results"
     
     # 文件过滤规则 / Rules
     # 排除列表 (文件名)
     EXCLUDE_FILES = {
-        "MyOwnSwordsman_S01E01.mp4"
+        "MyOwnSwordsman_S01E01.mp4",
         "MyOwnSwordsman_S01E01_1080p.mp4"
     }
     
@@ -57,7 +58,7 @@ def main():
             # 5. 准备参数 / Prepare arguments
             # 默认为 tiny 模式, x2 倍率
             cmd = [
-                "python", "infer.py",
+                sys.executable, str(project_dir / "infer.py"),
                 "-i", str(file_path),
                 "-o", str(target_dir),
                 "--mode", "tiny",

@@ -124,16 +124,20 @@ The graph above demonstrates the performance of our kernel for this specified wo
 
 ## Installation
 
+For the FlashVSR-Pro dependency baseline, follow [the project installation guide](../INSTALLATION.md)
+or run `bash scripts/install.sh` from the FlashVSR-Pro root. It installs the selected
+PyTorch build before compiling this bundled backend with compatible CUDA targets.
+
 Requirements:
 
-- CUDA 11.6 and above.
+- CUDA 11.7 and above for the standalone backend (FlashVSR-Pro uses CUDA 12.4).
 - PyTorch 1.12 and above.
 - Linux.
 
 ```sh
-pip install packaging
-pip install ninja
-python setup.py install
+python -m pip install packaging ninja wheel psutil
+BLOCK_SPARSE_ATTN_CUDA_ARCHS='80;90' BLOCK_SPARSE_ATTN_FORCE_BUILD=TRUE \
+  python -m pip install --no-build-isolation --no-deps .
 ```
 
 Block Sparse Interface: `block_sparse_attn/block_sparse_attn_interface.py`

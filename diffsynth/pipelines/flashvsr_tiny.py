@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, Literal
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -233,7 +234,7 @@ class FlashVSRTinyPipeline(BasePipeline):
         Generate text context using fixed prompt and initialize all CrossAttention KV caches in WanModel.
         Must be explicitly called once before __call__.
         """
-        prompt_path = "models/prompt_tensor/posi_prompt.pth"
+        prompt_path = Path(__file__).resolve().parents[2] / "models/prompt_tensor/posi_prompt.pth"
 
         if self.dit is None:
             raise RuntimeError("Please initialize self.dit first via fetch_models / from_model_manager")

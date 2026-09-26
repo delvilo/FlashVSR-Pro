@@ -16,6 +16,8 @@ import numpy as np
 from PIL import Image
 import imageio
 from tqdm import tqdm
+# Preserve the allocator default for direct Python execution.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128")
 import torch
 from einops import rearrange
 
@@ -589,7 +591,10 @@ def init_pipeline(args):
     # Determine model path (relative to this script)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     default_model_dir = os.path.join(script_dir, "models/FlashVSR-v1.1")
-    model_dir = os.getenv("FLASHVSR-Pro_MODEL_PATH", default_model_dir)
+    # Keep the legacy key readable; FLASHVSR_MODEL_PATH also works with shell export.
+    model_dir = os.path.expanduser(os.getenv(
+        "FLASHVSR_MODEL_PATH", os.getenv("FLASHVSR-Pro_MODEL_PATH", default_model_dir)
+    ))
     print(f"Loading models from: {model_dir}")
     
     # Setup dtype
@@ -740,11 +745,11 @@ def main():
         print(f"[WARNING] Setting tile-size to 128 (minimum supported value).")
         args.tile_size = 128
 
-    # Create output directory
-    if os.path.isdir(args.output):
+    # A path without a suffix is an output directory, even on a fresh checkout.
+    if os.path.isdir(args.output) or not os.path.splitext(args.output)[1]:
         output_dir = args.output
     else:
-        output_dir = os.path.dirname(args.output)
+        output_dir = os.path.dirname(os.path.abspath(args.output))
     # Always create output directory if it exists or not
     os.makedirs(output_dir, exist_ok=True)
     

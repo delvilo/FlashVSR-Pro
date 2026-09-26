@@ -28,5 +28,5 @@ setup(
         "Operating System :: OS Independent",
     ],
     package_data={"diffsynth": ["tokenizer_configs/**/**/*.*"]},
-    python_requires='>=3.6',
+    python_requires='>=3.10,<3.13',
 )

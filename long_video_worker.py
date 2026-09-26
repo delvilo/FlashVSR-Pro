@@ -2,19 +2,21 @@ import os
 import subprocess
 import shutil
 import argparse
+import sys
 from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(description="Process ultra-long videos by chunking")
     parser.add_argument("-i", "--input", required=True, help="Input video path")
     parser.add_argument("-o", "--output_dir", required=True, help="Output directory")
-    parser.add_argument("--segment_time", type=str, default="00:00:60", help="Split segment time (HH:MM:SS), default 5 mins")
+    parser.add_argument("--segment_time", type=str, default="00:01:00", help="Split segment time (HH:MM:SS), default 1 minute")
     parser.add_argument("--mode", default="tiny", help="Inference mode")
     parser.add_argument("--scale", default="2.0", help="Scale factor")
     
     args = parser.parse_args()
     
-    input_path = Path(args.input)
+    project_dir = Path(__file__).resolve().parent
+    input_path = Path(args.input).expanduser().resolve()
     video_name = input_path.stem
     work_dir = Path(f"temp_work_{video_name}")
     split_dir = work_dir / "splits"
@@ -55,7 +57,7 @@ def main():
         
         # Using Tile-DiT is crucial for 1080p chunks
         cmd = [
-            "python", "infer.py",
+            sys.executable, str(project_dir / "infer.py"),
             "-i", str(file_path),
             "-o", str(processed_dir),
             "--mode", args.mode,
