@@ -1,7 +1,7 @@
 # Adapted from https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/flash_blocksparse_attn_interface.py
 
-import block_sparse_attn_cuda
 import torch
+import block_sparse_attn_cuda
 import torch.nn as nn
 from typing import Optional, Tuple
 

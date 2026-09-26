@@ -85,5 +85,5 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Temporary Docker files
-.dockerignore.tmp
+# Temporary chunks produced by long_video_worker.py
+temp_work_*/

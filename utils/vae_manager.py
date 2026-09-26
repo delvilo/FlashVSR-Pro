@@ -51,7 +51,7 @@ class VAESystem:
                  tile_vae: bool = False,
                  tile_size: int = 512,
                  overlap: int = 32,
-                 model_dir: str = "./models/FlashVSR") -> nn.Module:
+                 model_dir: Optional[str] = None) -> nn.Module:
         """Load specified VAE model."""
         vae_type = vae_type.lower()
         if vae_type not in self.VAE_CONFIGS:
@@ -73,7 +73,9 @@ class VAESystem:
         # Determine weight path
         if weight_path is None:
              if config["default_path"]:
-                weight_path = config["default_path"]
+                base_dir = (Path(model_dir).expanduser() if model_dir is not None
+                            else Path(__file__).resolve().parents[1] / "models/FlashVSR-v1.1")
+                weight_path = str(base_dir / Path(config["default_path"]).name)
              else:
                 weight_path = None # tcd has no weight path
 

@@ -44,7 +44,7 @@ BASE_WHEEL_URL = (
 # SKIP_CUDA_BUILD: Intended to allow CI to use a simple `python setup.py sdist` run to copy over raw files, without any cuda compilation
 FORCE_BUILD = os.getenv("BLOCK_SPARSE_ATTN_FORCE_BUILD", "FALSE") == "TRUE"
 SKIP_CUDA_BUILD = os.getenv("BLOCK_SPARSE_ATTN_SKIP_CUDA_BUILD", "FALSE") == "TRUE"
-# For CI, we want the option to build with C++11 ABI since the nvcr images use C++11 ABI
+# For CI, allow matching the C++11 ABI of the installed PyTorch build.
 FORCE_CXX11_ABI = os.getenv("BLOCK_SPARSE_ATTN_FORCE_CXX11_ABI", "FALSE") == "TRUE"
 @functools.lru_cache(maxsize=None)
 def cuda_archs() -> str:
@@ -136,8 +136,8 @@ def check_if_cuda_home_none(global_option: str) -> None:
     # in that case.
     warnings.warn(
         f"{global_option} was requested, but nvcc was not found.  Are you sure your environment has nvcc available?  "
-        "If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch, "
-        "only images whose names contain 'devel' will provide nvcc."
+        "Install the NVIDIA CUDA Toolkit, set CUDA_HOME to its installation directory, "
+        "and add CUDA_HOME/bin to PATH before building from source."
     )
 
 
@@ -151,7 +151,10 @@ ext_modules = []
 
 # We want this even if SKIP_CUDA_BUILD because when we run python setup.py sdist we want the .hpp
 # files included in the source distribution, in case the user compiles from source.
-subprocess.run(["git", "submodule", "update", "--init", "csrc/cutlass"])
+# This repository also ships CUTLASS as regular files. Only fetch it when absent.
+if not (Path(this_dir) / "csrc/cutlass/include/cutlass/cutlass.h").is_file():
+    subprocess.run(["git", "submodule", "update", "--init", "csrc/cutlass"],
+                   cwd=this_dir, check=True)
 
 if not SKIP_CUDA_BUILD:
     print("\n\ntorch.__version__  = {}\n\n".format(torch.__version__))
