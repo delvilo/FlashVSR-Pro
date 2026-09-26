@@ -1,0 +1,319 @@
+{
+  "version": 1,
+  "source_commit": "4fa8c51af08174379418e28550c903367bdc9662",
+  "base_url": "https://raw.githubusercontent.com/delvilo/FlashVSR-Pro/4fa8c51af08174379418e28550c903367bdc9662/inputs/",
+  "samples": {
+    "JIUTIAN-gen/test_10s0.mp4": {
+      "bytes": 3851774,
+      "sha256": "616dbc3dfa6604c700ab0b99fb55d9214633aaa2a3f991301bc5bdc21b2c1de6"
+    },
+    "JIUTIAN-gen/test_10s1.mp4": {
+      "bytes": 5868256,
+      "sha256": "be4e5c660f1131f265475d33f43d9addcc3cd96e072d4bfbd1b8c83ae5ce6e3f"
+    },
+    "JIUTIAN-gen/test_10s2.mp4": {
+      "bytes": 2489697,
+      "sha256": "1bbc3a5580c5f724a24fff9d2f067db338048943856c5bec62891e6b017dc00c"
+    },
+    "JIUTIAN-gen/test_10s3.mp4": {
+      "bytes": 3391324,
+      "sha256": "ef5f74a18fc4d300315e8f37e88fe70cfc88bf513469c476977aa3328c295a27"
+    },
+    "JIUTIAN-gen/test_10s4.mp4": {
+      "bytes": 3820550,
+      "sha256": "778c06fd8e569a4b4e5a70765fbc45bd289349619fa5a595760f5eba13f3afb9"
+    },
+    "JIUTIAN-gen/test_10s5.mp4": {
+      "bytes": 4891723,
+      "sha256": "1cc8d39ee86cf9d747eb96835705e1ff3330d10849aec293442ba6aa889d565b"
+    },
+    "JIUTIAN-gen/test_10s6.mp4": {
+      "bytes": 2313445,
+      "sha256": "da73e52ca618a89ce30437289fba3f1f459f189abc1b175f25ca0cf1c2d6ce15"
+    },
+    "JIUTIAN-gen/test_10s7.mp4": {
+      "bytes": 2396015,
+      "sha256": "f4df3c42cf9c740f63e183c9a29a18356d1039850eb3e8fe9fd66401aa27bfc4"
+    },
+    "JIUTIAN-gen/test_10s8.mp4": {
+      "bytes": 1346072,
+      "sha256": "3d6174cf2339a4ab05ed4a5f40dd9e9833dcdb4fdd4f5739f8a9c0514f838c76"
+    },
+    "JIUTIAN-gen/test_10s9.mp4": {
+      "bytes": 3539951,
+      "sha256": "ea66d68da842fa28aced3aaed409b0d7680efada1c65fabb92811da2d2e77d7c"
+    },
+    "JIUTIAN-gen/test_1x1_0.mp4": {
+      "bytes": 1219001,
+      "sha256": "48cc3eefc6d13b8911c9ddb96971d16e83ed162565e90a02cca9013dad77e8db"
+    },
+    "JIUTIAN-gen/test_1x1_1.mp4": {
+      "bytes": 985364,
+      "sha256": "9e1727a56a81b17bb28f397903ad25d05f3e19fe48e544845ffa4cea0dc87f16"
+    },
+    "JIUTIAN-gen/test_1x1_2.mp4": {
+      "bytes": 2408246,
+      "sha256": "3e158d289180a7e686766be8a938ff5be1b6891d5516a2e82244ef0a386a5e0a"
+    },
+    "JIUTIAN-gen/test_3x4_0.mp4": {
+      "bytes": 1447052,
+      "sha256": "8010e760e72b5076e97c99c168c465db5b74a949e6b6bfea5cb4a1c5a5b0a031"
+    },
+    "JIUTIAN-gen/test_3x4_1.mp4": {
+      "bytes": 2270431,
+      "sha256": "e98493458ddeb402bfb9e256d137b6fcbadfc976d3e06902a8dff5739ed78516"
+    },
+    "JIUTIAN-gen/test_3x4_2.mp4": {
+      "bytes": 3384659,
+      "sha256": "76bdd7972b480091e12fd313f519ffdf4bc259c2828208dae0f33775e05664be"
+    },
+    "JIUTIAN-gen/test_4x3_0.mp4": {
+      "bytes": 2998291,
+      "sha256": "963c53adc4dd4b2219f17eb5a29e62fab42f858fdc7eee3db0dbbd1b556013cb"
+    },
+    "JIUTIAN-gen/test_4x3_1.mp4": {
+      "bytes": 4273367,
+      "sha256": "785e345aca482e1d9222f2d31e2fd1b73ecaa8806c488bc66be4dd7aef9a95f7"
+    },
+    "JIUTIAN-gen/test_4x3_2.mp4": {
+      "bytes": 3122141,
+      "sha256": "b55867920ada3fe13015086a9dd64ec1e096d352d6a5ebf926f7571469786583"
+    },
+    "JIUTIAN-gen/test_9x16_0.mp4": {
+      "bytes": 1305883,
+      "sha256": "2dc07d56985008316377241db1e6850abef6f818ef93d3b38a139864644cbb82"
+    },
+    "JIUTIAN-gen/test_9x16_1.mp4": {
+      "bytes": 1342353,
+      "sha256": "687183dae3bdf76459fa893adc6baad3d5335dc8c5a063b3938f27a6b2272b04"
+    },
+    "JIUTIAN-gen/test_9x16_2.mp4": {
+      "bytes": 2489870,
+      "sha256": "acdb43cc49d128632ea6b4f1e00a9799f2b5942228c19be23bd35bd901eed2d5"
+    },
+    "JIUTIAN-gen/test_face0.mp4": {
+      "bytes": 747528,
+      "sha256": "84e3e77275c8a304407862b6427816d62f3860646ba66da29a81651fa2e3a394"
+    },
+    "JIUTIAN-gen/test_face1.mp4": {
+      "bytes": 1059204,
+      "sha256": "efca8f1a9fac6abb1ca14d1d02e77f3fa0dbaa30127bb36807192b273fdab786"
+    },
+    "JIUTIAN-gen/test_face2.mp4": {
+      "bytes": 1715660,
+      "sha256": "159e5084e66d779b099e6e530217344fa3c064328deb361c189a11e749797259"
+    },
+    "JIUTIAN-gen/test_face3.mp4": {
+      "bytes": 902972,
+      "sha256": "e7418e1efaa0204d1863d1a429c27d38a31b34c596002a6fedd26ab3b150762b"
+    },
+    "JIUTIAN-gen/test_face4.mp4": {
+      "bytes": 1234836,
+      "sha256": "f54e5d6b9c23206889fdd8432dbe860933f5bd8e0c460039ac002e9869d587ae"
+    },
+    "JIUTIAN-gen/test_face5.mp4": {
+      "bytes": 1661592,
+      "sha256": "ef500bff61b29c1bca8dacf39bc858f4b5b8717a0e0265278e6bafc2a69f21ed"
+    },
+    "JIUTIAN-gen/test_face6.mp4": {
+      "bytes": 1102782,
+      "sha256": "361e871871e679937828ae2c8ab950bf4fde5784d45cba50a86491f466e2d682"
+    },
+    "JIUTIAN-gen/test_face7.mp4": {
+      "bytes": 2302295,
+      "sha256": "4e8ce73639b7b12822c9c5db70347ad02552bce641cba385650fc8ed9854eea3"
+    },
+    "JIUTIAN-gen/test_face8.mp4": {
+      "bytes": 2318354,
+      "sha256": "211e1c8ed9a4ec8ec3593014f422a6befd882a3bbb8055deac6e42f9cfff3254"
+    },
+    "JIUTIAN-gen/test_face9.mp4": {
+      "bytes": 1319868,
+      "sha256": "d28d80baf6db4db95920027b31ff6efec8a12201a51ce7c19a0f6c3473263931"
+    },
+    "JIUTIAN-gen/test_i2v0.mp4": {
+      "bytes": 1778360,
+      "sha256": "e118a47f819ae0a8b672bd0c39c05a2b469e7a9c6156c88ebe33ee1d288798fb"
+    },
+    "JIUTIAN-gen/test_i2v1.mp4": {
+      "bytes": 2592866,
+      "sha256": "7365e0e1c4f823ace96cd13a41ef80aa372c6b7650e5d217b23ad6e5ffe60cf4"
+    },
+    "JIUTIAN-gen/test_i2v2.mp4": {
+      "bytes": 2077636,
+      "sha256": "e1450547f8119fb3dce5b32fcdc21fc068fef39e89dd921d8aa0ad9f6c5cd743"
+    },
+    "JIUTIAN-gen/test_i2v3.mp4": {
+      "bytes": 2713706,
+      "sha256": "ba6c4a46fb6b44a9a85538367a0fba4b48ff21eb009e65baf66e3380427dafd7"
+    },
+    "JIUTIAN-gen/test_i2v4.mp4": {
+      "bytes": 1653913,
+      "sha256": "1dda0708497483eec3038b671043c168f9127b39b8d38b3ceacbfb859dbe1912"
+    },
+    "JIUTIAN-gen/test_i2v5.mp4": {
+      "bytes": 4044145,
+      "sha256": "53993965092df2668f119de8f0cf900a5a3b9e22e3f38ffe9291d22ad52aadf5"
+    },
+    "JIUTIAN-gen/test_i2v6.mp4": {
+      "bytes": 692267,
+      "sha256": "ed9186855e5846c8dcbc1c4f8d92a099efef33f35302537e6f988b71768bc08c"
+    },
+    "JIUTIAN-gen/test_i2v7.mp4": {
+      "bytes": 1695508,
+      "sha256": "a1578efe18135f89a22da8f4a005184f3c46b05cdcdf7e3528226df92b393a30"
+    },
+    "JIUTIAN-gen/test_i2v8.mp4": {
+      "bytes": 2629607,
+      "sha256": "d7b9e88156f034dd34aebb2310a253c70afc61f98bfc1a9bcf9b4da94656eade"
+    },
+    "JIUTIAN-gen/test_i2v9.mp4": {
+      "bytes": 1839041,
+      "sha256": "b1506670236e92b387cbc2aba479473e373300fb1116f1eec82d3a546de1ad96"
+    },
+    "JIUTIAN-gen/test_special0.mp4": {
+      "bytes": 2676375,
+      "sha256": "01d969b63b8be36cb8295c97eed735248506fb5e9a6824a9254f53b54b84f113"
+    },
+    "JIUTIAN-gen/test_special1.mp4": {
+      "bytes": 659935,
+      "sha256": "a89cf1d6c86fcf6fd9f587f123cada58c57b1bce1722951e514e6e4288c2312b"
+    },
+    "JIUTIAN-gen/test_special2.mp4": {
+      "bytes": 846086,
+      "sha256": "42edabf299bef578ae0afee729e320cc710bab9b47678fc412596bce7bd40331"
+    },
+    "JIUTIAN-gen/test_special3.mp4": {
+      "bytes": 2319684,
+      "sha256": "11ae0806ddd6f9c41a6ffda6cfd2521e9654ffd58a7dab5f9399a8499ac34a3e"
+    },
+    "JIUTIAN-gen/test_special4.mp4": {
+      "bytes": 947369,
+      "sha256": "7a32eabfebefc917b8acb62d7498098b4aee95e70e98bf90eb7c4848d004e0ec"
+    },
+    "JIUTIAN-gen/test_special5.mp4": {
+      "bytes": 3422576,
+      "sha256": "9b5e61dbe7c3f07bf788f0a2d51b67aa1c203f642aa6eedb413b0566052b4012"
+    },
+    "JIUTIAN-gen/test_special6.mp4": {
+      "bytes": 1328236,
+      "sha256": "5a372db27fa679725f910b54aa0d956c6a6e1dbe4653dc6e7d5110ed1f40bf6b"
+    },
+    "JIUTIAN-gen/test_special7.mp4": {
+      "bytes": 2959669,
+      "sha256": "9c7f8705e5dba40f6ede0dbc344acb4e1c4690b5cc68f94fe77bd7d9dd1b8ddf"
+    },
+    "JIUTIAN-gen/test_special8.mp4": {
+      "bytes": 2846004,
+      "sha256": "643fb21ae171648292d4e87917b1c2d816124c66be70a6849f0f9c69d99b4f80"
+    },
+    "JIUTIAN-gen/test_special9.mp4": {
+      "bytes": 2649952,
+      "sha256": "b14f190f2634916ecaba30c143929d234a1cf841b6d69ad605a51e19f8c500d8"
+    },
+    "JIUTIAN-gen/test_t2v0.mp4": {
+      "bytes": 2143026,
+      "sha256": "74cf7a76687c9e821cdbddb4bf241ed4eb14d9570832634f899b989ce5d61bc8"
+    },
+    "JIUTIAN-gen/test_t2v1.mp4": {
+      "bytes": 695558,
+      "sha256": "3110b4067a1e09dd619a29e25d93082974b6b598edd8f6d8d05a2847f2272e31"
+    },
+    "JIUTIAN-gen/test_t2v2.mp4": {
+      "bytes": 702619,
+      "sha256": "a1163cad668fbe54e19568cd0575155053e7e264aefa5aeae2a4f662f19ef83a"
+    },
+    "JIUTIAN-gen/test_t2v3.mp4": {
+      "bytes": 3328816,
+      "sha256": "130d841a76c101cb7bdbc1269466110ffc76e589df487ae48eb480c461e66dfa"
+    },
+    "JIUTIAN-gen/test_t2v4.mp4": {
+      "bytes": 965628,
+      "sha256": "26fb93e35964bb0cf96dc238ec5d6ff5b639e715931f95633db2b5d60d705928"
+    },
+    "JIUTIAN-gen/test_t2v5.mp4": {
+      "bytes": 1037295,
+      "sha256": "4798f9b4d8b3baa2edb8146d2c9c9b4ce19a6902b4d8a73007328c6e737e7fd5"
+    },
+    "JIUTIAN-gen/test_t2v6.mp4": {
+      "bytes": 2730310,
+      "sha256": "6b0ad5c38bdabae821e1a9b72b9a8b9bd1b2dc1e75e4b2b7aa078216918d0fd1"
+    },
+    "JIUTIAN-gen/test_t2v7.mp4": {
+      "bytes": 1343269,
+      "sha256": "1335fbcf56170c2813d013d8a848aff7035da8ce7de5e1d0647e66a883fbd9c4"
+    },
+    "JIUTIAN-gen/test_t2v8.mp4": {
+      "bytes": 2236207,
+      "sha256": "2f3e6665bfc5062cfec85851dde83f2888e45953b13e64ac4bfe67a34e93ca5f"
+    },
+    "JIUTIAN-gen/test_t2v9.mp4": {
+      "bytes": 1173891,
+      "sha256": "46f5899e8c7eeef505d4b25f9a29a1c2799f969d71a67dd6b19d98d3a6f61514"
+    },
+    "JIUTIAN-gen/test_text0.mp4": {
+      "bytes": 1325530,
+      "sha256": "d63761b67947d4fccd3ed1c2c8b225958e066badec7ce2dd93250e4cc3626ca7"
+    },
+    "JIUTIAN-gen/test_text1.mp4": {
+      "bytes": 467921,
+      "sha256": "fcdf2598c4afe60324a09c30afff296ac4a1c487385eb885289baa86c1f35e97"
+    },
+    "JIUTIAN-gen/test_text2.mp4": {
+      "bytes": 782202,
+      "sha256": "b461f66601dbd295c04d132d0d481174b3f8aea55dfa59650f20021b4a24c8d0"
+    },
+    "JIUTIAN-gen/test_text3.mp4": {
+      "bytes": 1786159,
+      "sha256": "3c23393d4ec74ce2a565fc045d277138806821323343870bea846189a0ea67e8"
+    },
+    "JIUTIAN-gen/test_text4.mp4": {
+      "bytes": 999926,
+      "sha256": "bc9c2ac67cb1cc0abd7dae52b59b9666c621c6a644addcc1f7b6d2551a8bd252"
+    },
+    "JIUTIAN-gen/test_text5.mp4": {
+      "bytes": 1053194,
+      "sha256": "c81aa4929b71c63c5b0af6c42392f498210be510881ccf97c5b3847fcae517a7"
+    },
+    "JIUTIAN-gen/test_text6.mp4": {
+      "bytes": 935606,
+      "sha256": "79c60d2415c92856677a82e9b3119dc6bac02c14a3d11abedf0a527a78a6c2d4"
+    },
+    "JIUTIAN-gen/test_text7.mp4": {
+      "bytes": 2113021,
+      "sha256": "581c281a7c3f9fa01fe3c028f0f64b2ee85e2fc338aefea1d0f614bb50cb5eea"
+    },
+    "JIUTIAN-gen/test_text8.mp4": {
+      "bytes": 559354,
+      "sha256": "d2148911a1390397ab0297ac80bdc886a6652a219eb452006559e8d8fcbd58c7"
+    },
+    "JIUTIAN-gen/test_text9.mp4": {
+      "bytes": 836257,
+      "sha256": "b88c6fece8def61cc945f6f88af7a6e8c6d9b2819cdc172306ea63e366be00ac"
+    },
+    "YXQ_input.mp4": {
+      "bytes": 497708,
+      "sha256": "4b08fade0ed625636ab2dc02e7990030602d9e763d7abb054ad8ca0852ed2f94"
+    },
+    "example0.mp4": {
+      "bytes": 5117409,
+      "sha256": "4090442178d6e6a9822067afd4f86659e5bd86b8e4d4bb0ea5f0d46e7eff20d1"
+    },
+    "example1.mp4": {
+      "bytes": 10476670,
+      "sha256": "ab6026580e7aefe099cc0ab0396c3dd23e31d3ac03654e0385638a60c3097482"
+    },
+    "example2.mp4": {
+      "bytes": 7940554,
+      "sha256": "8f0bf3344030a28e4359d499b40ae01debd7f06bb8d959ddff3988644496f35b"
+    },
+    "example3.mp4": {
+      "bytes": 7387217,
+      "sha256": "928533db6a453aa4098501dc127d6187dc6967762993374772aed6334e0019e7"
+    },
+    "example4.mp4": {
+      "bytes": 1523848,
+      "sha256": "a6bd7f88458903421111ee2d31dc154ab9947d703ab51680b888713c6cc56808"
+    }
+  }
+}

@@ -1,4 +1,9 @@
 import os
+import sys
+
+if not sys.platform.startswith("linux"):
+    raise RuntimeError("FlashVSR-Pro supports Linux and Google Colab only.")
+
 from setuptools import setup, find_packages
 
 # Path to the requirements file
@@ -25,7 +30,7 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
-        "Operating System :: OS Independent",
+        "Operating System :: POSIX :: Linux",
     ],
     package_data={"diffsynth": ["tokenizer_configs/**/**/*.*"]},
     python_requires='>=3.10,<3.13',

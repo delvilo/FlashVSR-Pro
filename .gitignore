@@ -87,3 +87,10 @@ Desktop.ini
 
 # Temporary chunks produced by long_video_worker.py
 temp_work_*/
+
+# Generated third-party documentation (available from upstream)
+/Block-Sparse-Attention/csrc/cutlass/docs/
+/Block-Sparse-Attention/csrc/cutlass/python/docs/
+
+# Incomplete sample downloads
+/inputs/**/*.part

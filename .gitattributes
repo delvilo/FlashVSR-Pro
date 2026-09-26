@@ -1,0 +1,2 @@
+# Preserve upstream source while excluding vendored code from language statistics.
+Block-Sparse-Attention/csrc/cutlass/** linguist-vendored
