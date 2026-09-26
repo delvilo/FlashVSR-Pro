@@ -1,37 +1,10 @@
-import os
+"""Compatibility shim; package metadata and dependencies live in pyproject.toml."""
+
 import sys
 
 if not sys.platform.startswith("linux"):
     raise RuntimeError("FlashVSR-Pro supports Linux and Google Colab only.")
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
-# Path to the requirements file
-requirements_path = os.path.join(os.path.dirname(__file__), "requirements.txt")
-
-# Read the requirements from the requirements file
-if os.path.exists(requirements_path):
-    with open(requirements_path, 'r') as f:
-        install_requires = [
-            line.strip() for line in f
-            if line.strip() and not line.strip().startswith('#')
-        ]
-else:
-    install_requires = []
-
-setup(
-    name="diffsynth",
-    version="1.1.7",
-    description="Enjoy the magic of Diffusion models!",
-    author="Artiprocher",
-    packages=find_packages(),
-    install_requires=install_requires,
-    include_package_data=True,
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Apache Software License",
-        "Operating System :: POSIX :: Linux",
-    ],
-    package_data={"diffsynth": ["tokenizer_configs/**/**/*.*"]},
-    python_requires='>=3.10,<3.13',
-)
+setup()

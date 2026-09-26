@@ -29,6 +29,8 @@ parser.add_argument('-o')
 args, extra = parser.parse_known_args()
 source = Path(args.i)
 destination = Path(args.o) / ('processed_' + source.name)
+if Path(args.o).suffix:
+    destination = Path(args.o)
 shutil.copyfile(source, destination)
 with open(os.environ['FLASHVSR_TEST_LOG'], 'a') as log:
     log.write(json.dumps({'python': sys.executable, 'input': str(source),
@@ -49,6 +51,10 @@ class NativeLauncherTests(unittest.TestCase):
         (self.checkout / "infer.py").write_text(INFERENCE_STAND_IN)
         for name in ("batch_inference.py", "long_video_worker.py"):
             shutil.copyfile(PROJECT / name, self.checkout / name)
+        utils = self.checkout / "utils"
+        utils.mkdir()
+        for name in ("__init__.py", "cli.py", "media.py"):
+            shutil.copyfile(PROJECT / "utils" / name, utils / name)
         self.log = self.root / "inference.jsonl"
         self.env = dict(os.environ, FLASHVSR_TEST_LOG=str(self.log), PATH=str(self.bin_dir))
 
@@ -73,7 +79,7 @@ class NativeLauncherTests(unittest.TestCase):
         calls = self.run_launcher("batch_inference.py")
 
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0]["python"], sys.executable)
+        self.assertEqual(os.path.normpath(calls[0]["python"]), os.path.normpath(sys.executable))
         self.assertEqual(Path(calls[0]["input"]), sample)
         self.assertIn("--keep-audio", calls[0]["extra"])
         output = self.checkout / "results/nested folder/processed_example_audio.mp4"
@@ -84,6 +90,7 @@ class NativeLauncherTests(unittest.TestCase):
     def test_long_worker_splits_and_merges_from_another_directory(self):
         ffmpeg = shutil.which("ffmpeg")
         (self.bin_dir / "ffmpeg").symlink_to(ffmpeg)
+        (self.bin_dir / "ffprobe").symlink_to(shutil.which("ffprobe"))
         sample = self.caller / "sample video.mp4"
         subprocess.run([
             ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi",
@@ -94,10 +101,11 @@ class NativeLauncherTests(unittest.TestCase):
         calls = self.run_launcher(
             "long_video_worker.py", "-i", sample.name, "-o", "output folder",
             "--segment_time", "00:00:01",
+            "--scale", "1.0",
         )
 
         self.assertEqual(len(calls), 2)
-        self.assertTrue(all(call["python"] == sys.executable for call in calls))
+        self.assertTrue(all(os.path.normpath(call["python"]) == os.path.normpath(sys.executable) for call in calls))
         self.assertTrue(all("--keep-audio" in call["extra"] for call in calls))
         output = self.caller / "output folder/FlashVSR_sample video_Final.mp4"
         probe = subprocess.run([
@@ -108,6 +116,37 @@ class NativeLauncherTests(unittest.TestCase):
         stream = json.loads(probe.stdout)["streams"][0]
         self.assertEqual((stream["width"], stream["height"]), (128, 96))
         self.assertEqual(int(stream["nb_read_frames"]), 16)
+
+        # A subsequent child failure must preserve the final output and clean its own work directory.
+        previous = output.read_bytes()
+        (self.checkout / "infer.py").write_text("raise SystemExit(9)\n")
+        result = subprocess.run([
+            sys.executable, str(self.checkout / "long_video_worker.py"),
+            "-i", sample.name, "-o", "output folder", "--segment_time", "00:00:01",
+            "--scale", "1.0",
+        ], cwd=self.caller, env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        temporary = next(line.split(": ", 1)[1] for line in result.stdout.splitlines()
+                         if line.startswith("Temporary directory:"))
+        self.assertFalse(Path(temporary).exists())
+        self.assertEqual(output.read_bytes(), previous)
+
+    def test_batch_propagates_child_failure(self):
+        inputs = self.checkout / "inputs"
+        inputs.mkdir()
+        (inputs / "bad.mp4").write_bytes(b"invalid")
+        (self.checkout / "infer.py").write_text("raise SystemExit(7)\n")
+        result = subprocess.run([sys.executable, str(self.checkout / "batch_inference.py")],
+                                env=self.env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("1 failed", result.stdout)
+
+    def test_worker_rejects_invalid_arguments_before_creating_work(self):
+        result = subprocess.run([sys.executable, str(self.checkout / "long_video_worker.py"),
+                                 "-i", "missing.mp4", "-o", "out", "--segment-time", "0"],
+                                cwd=self.caller, env=self.env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(list(self.caller.iterdir()), [])
 
 
 if __name__ == "__main__":

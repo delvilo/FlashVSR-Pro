@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diffsynth"
+version = "1.1.7"
+description = "FlashVSR-Pro runtime with bundled DiffSynth pipelines"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE", "Block-Sparse-Attention/LICENSE", "Block-Sparse-Attention/csrc/cutlass/LICENSE.txt"]
+authors = [{name = "Artiprocher"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["diffsynth*", "utils*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+diffsynth = ["tokenizer_configs/**/*"]

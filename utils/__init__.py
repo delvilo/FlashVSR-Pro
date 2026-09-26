@@ -1,21 +1,21 @@
-# utils/__init__.py
-"""
-FlashVSR utility modules
-"""
+"""FlashVSR utilities; lightweight checks can be used before installing PyTorch."""
 
-# Utilities
-from .utils import (
-    RMS_norm,
-    CausalConv3d,
-    PixelShuffle3d,
-    Buffer_LQ4x_Proj,
-    Causal_LQ4x_Proj,
-)
+from importlib import import_module
 
-from .TCDecoder import build_tcdecoder
+_EXPORTS = {
+    "RMS_norm": "utils",
+    "CausalConv3d": "utils",
+    "PixelShuffle3d": "utils",
+    "Buffer_LQ4x_Proj": "utils",
+    "Causal_LQ4x_Proj": "utils",
+    "build_tcdecoder": "TCDecoder",
+}
+__all__ = list(_EXPORTS)
 
-# VAE manager
-from . import vae_manager
 
-# Audio and tiling utilities will be imported dynamically when used
-# Avoid forcing dependencies
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    value = getattr(import_module(f".{_EXPORTS[name]}", __name__), name)
+    globals()[name] = value
+    return value

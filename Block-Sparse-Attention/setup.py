@@ -22,7 +22,13 @@ import urllib.request
 import urllib.error
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
-import torch
+try:
+    import torch
+except ImportError as error:
+    raise RuntimeError(
+        "Install the pinned PyTorch wheels first, then build this backend with "
+        "--no-build-isolation. See INSTALLATION.md."
+    ) from error
 from torch.utils.cpp_extension import (
     BuildExtension,
     CppExtension,
@@ -371,14 +377,9 @@ setup(
     else {
         "bdist_wheel": CachedWheelsCommand,
     },
-    python_requires=">=3.9",
+    python_requires=">=3.10,<3.13",
     install_requires=[
-        "torch",
-        "einops",
-    ],
-    setup_requires=[
-        "packaging",
-        "psutil",
-        "ninja",
+        "torch==2.6.0",
+        "einops==0.8.1",
     ],
 )

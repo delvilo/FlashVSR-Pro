@@ -135,12 +135,13 @@ the generated documentation that is no longer included in the checkout.
 
 Requirements:
 
-- CUDA 11.7 and above for the standalone backend (FlashVSR-Pro uses CUDA 12.4).
-- PyTorch 1.12 and above.
+- CUDA Toolkit 12.4.x for this FlashVSR-Pro build.
+- Python 3.10–3.12 and PyTorch 2.6.0+cu124.
 - Linux.
 
 ```sh
-python -m pip install packaging ninja wheel psutil
+python -m pip install -r ../requirements-build.txt
+python -m pip install -r ../requirements-cuda.txt
 BLOCK_SPARSE_ATTN_CUDA_ARCHS='80;90' BLOCK_SPARSE_ATTN_FORCE_BUILD=TRUE \
   python -m pip install --no-build-isolation --no-deps .
 ```
