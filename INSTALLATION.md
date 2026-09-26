@@ -1,6 +1,6 @@
 # FlashVSR-Pro installation
 
-This guide covers direct installation and execution on **Linux and Google Colab**. WSL 2, native Windows, and macOS compatibility is deferred to the next platform cleanup.
+This guide covers direct installation and execution on **native Linux and Google Colab**. Windows, macOS, and WSL 2 are not supported.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ export PATH="$CUDA_HOME/bin:$PATH"
 ### 2. Checkout and Python environment
 
 ```bash
-git clone https://github.com/delvilo/FlashVSR-Pro.git
+git clone --depth 1 https://github.com/delvilo/FlashVSR-Pro.git
 cd FlashVSR-Pro
 python3 --version
 python3 -m venv .venv
@@ -52,7 +52,7 @@ source .venv/bin/activate
 
 If the system Python is outside 3.10–3.12, install Python 3.11 with its matching development and venv packages, then create the environment using `python3.11 -m venv .venv`. You can instead activate an existing Conda environment with a supported Python version.
 
-The sparse attention source and CUTLASS headers are included as regular files in this checkout. A separate clone of the backend is unnecessary.
+The sparse attention source and CUTLASS headers are included as regular files in this checkout. No submodule initialization is required. See [THIRD_PARTY.md](THIRD_PARTY.md) for dependency sources and licenses. The shallow clone avoids downloading historical sample binaries and generated documentation; existing Git history is unchanged.
 
 ### 3. Install
 
@@ -103,8 +103,11 @@ To use another location, download into that directory and set `FLASHVSR_MODEL_PA
 ```bash
 python -c "import torch; import block_sparse_attn; import diffsynth; print(torch.__version__, torch.version.cuda, torch.cuda.get_device_name())"
 python infer.py --help
+python scripts/download_samples.py example0.mp4
 python infer.py -i inputs/example0.mp4 -o results/ --mode tiny --scale 4.0 --tile-dit
 ```
+
+The sample downloader needs only Python's standard library. It fetches the selected video from a fixed repository commit and verifies its byte count and SHA-256 before saving it. Use your own video path to skip the sample download. See [inputs/README.md](inputs/README.md) for the optional collection.
 
 For subsequent sessions, activate the same environment. You may call the scripts using absolute paths from another directory; the bundled models and prompt do not depend on the shell's working directory.
 
@@ -149,7 +152,7 @@ install_env['FLASHVSR_PYTHON'] = sys.executable
 subprocess.run(['bash', 'scripts/install.sh'], cwd=project, env=install_env, check=True)
 ```
 
-Download models and choose an uploaded video (or a video on mounted Google Drive):
+Download models and choose an input. The following cell uses an optional sample; replace `input_video` with an uploaded video or a path on mounted Google Drive to use your own:
 
 ```python
 subprocess.run([
@@ -158,8 +161,12 @@ subprocess.run([
     "snapshot_download('JunhaoZhuang/FlashVSR-v1.1', local_dir='models/FlashVSR-v1.1')"
 ], cwd=project, check=True)
 
-input_video = Path('/content/input.mp4')  # Change this to your uploaded video.
+input_video = project / 'inputs/example0.mp4'  # Or Path('/content/input.mp4').
 output_video = Path('/content/enhanced.mp4')
+if input_video == project / 'inputs/example0.mp4':
+    subprocess.run([
+        sys.executable, str(project / 'scripts/download_samples.py'), 'example0.mp4'
+    ], cwd=project, check=True)
 if not input_video.is_file():
     raise FileNotFoundError(input_video)
 subprocess.run([
@@ -207,6 +214,8 @@ bash scripts/install.sh
 
 Editable installation exposes Python source changes immediately. Rebuild the attention backend after changes to its source, PyTorch, Python, or CUDA. Download model weights only when they change or are missing.
 
+After updating from a version that bundled sample videos, run `python scripts/download_samples.py` to restore the default sample if needed. The installer downloads neither samples nor model weights.
+
 ## Troubleshooting
 
 ### CUDA or extension build errors
@@ -243,5 +252,9 @@ Use `--mode tiny --tile-dit`, reduce `--tile-size` to 128, or shorten the input.
 ### Missing weights or audio
 
 Verify the filenames in the weights table and `FLASHVSR_MODEL_PATH`. If models were obtained through Git LFS, run `git lfs pull` in that model checkout. For audio, pass `--keep-audio` and check `ffprobe -i input.mp4` for an audio stream.
+
+### Missing sample or failed download
+
+Run `python scripts/download_samples.py --list` to see valid sample paths, then download the required one. If an existing file differs from the manifest, choose another `--output-dir` or use `--force` to replace it after the new download passes verification. Interrupted or invalid downloads are discarded; rerun the same command to retry. Using your own input does not require access to the sample archive.
 
 When reporting a problem, include the Linux/Colab runtime, Python version, GPU model, `nvcc` version, PyTorch version, command, and full error output.

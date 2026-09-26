@@ -2,7 +2,7 @@
 
 FlashVSR-Pro is an independent implementation of the diffusion-based streaming video super-resolution method from [FlashVSR](https://arxiv.org/abs/2510.12747). It provides a unified command-line interface for enhancing videos and image sequences.
 
-This branch uses direct Python execution on **Linux and Google Colab**. See [INSTALLATION.md](INSTALLATION.md) for setup, model downloads, and troubleshooting.
+FlashVSR-Pro supports direct Python execution on **native Linux and Google Colab**. See [INSTALLATION.md](INSTALLATION.md) for setup, model downloads, and troubleshooting.
 
 ## Features
 
@@ -28,7 +28,7 @@ This branch uses direct Python execution on **Linux and Google Colab**. See [INS
 
 VRAM use depends on resolution, duration, mode, and tiling. Start with a short clip in `tiny` mode and `--tile-dit`; 16 GB or more gives more room for processing. A GPU being assigned in Colab does not guarantee compatibility: **T4 and P100 are unsupported** by this backend. Select A100 or L4 when available.
 
-WSL 2, native Windows, and macOS are outside this change's validation scope. Existing platform-specific code is deferred to a separate cleanup.
+Windows, macOS, and WSL 2 are not supported. Project build scripts target Linux; bundled third-party source retains its upstream portability code.
 
 ## Linux quick start
 
@@ -40,7 +40,7 @@ On Ubuntu/Debian, install system dependencies and create a Python environment:
 sudo apt-get update
 sudo apt-get install -y build-essential git git-lfs ffmpeg python3-venv python3-dev
 
-git clone https://github.com/delvilo/FlashVSR-Pro.git
+git clone --depth 1 https://github.com/delvilo/FlashVSR-Pro.git
 cd FlashVSR-Pro
 
 # Use python3.11 (and its matching venv/dev packages) if python3 is outside 3.10–3.12.
@@ -57,17 +57,20 @@ Download the model weights into the project checkout:
 python -c "from huggingface_hub import snapshot_download; snapshot_download('JunhaoZhuang/FlashVSR-v1.1', local_dir='models/FlashVSR-v1.1')"
 ```
 
-Run a short sample:
+Download and run a short sample:
 
 ```bash
+python scripts/download_samples.py example0.mp4
 python infer.py -i inputs/example0.mp4 -o results/ --mode tiny --scale 4.0 --tile-dit
 ```
+
+Sample videos are optional downloads. Use your own input directly, or see [inputs/README.md](inputs/README.md) to list and download other samples. Downloads are checked against a pinned size and SHA-256 manifest.
 
 After opening a new shell, activate the same environment before running inference. Installation does not need to be repeated unless dependencies change.
 
 ## Google Colab
 
-Open [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) in Google Colab, select an **A100 or L4 GPU runtime**, and run the cells in order. The notebook checks the GPU and toolkit, installs into the notebook's Python environment, downloads models, and runs `infer.py` as a subprocess. Use a short input first.
+Open [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) in Google Colab, select an **A100 or L4 GPU runtime**, and run the cells in order. The notebook checks the GPU and toolkit, installs into the notebook's Python environment, downloads models, and runs `infer.py` as a subprocess. It downloads the default sample on demand; you can also select an uploaded video. Use a short input first.
 
 The complete manual workflow is in [INSTALLATION.md — Google Colab](INSTALLATION.md#google-colab). Colab's runtime storage is temporary; download results or copy them to mounted Google Drive before the runtime is reset.
 
@@ -80,6 +83,7 @@ The complete manual workflow is in [INSTALLATION.md — Google Colab](INSTALLATI
 | `tiny-long` | TCDecoder | Streaming model path for longer videos |
 
 ```bash
+python scripts/download_samples.py example0.mp4 example4.mp4
 python infer.py -i inputs/example0.mp4 -o results/ --mode full --tile-vae
 python infer.py -i inputs/example0.mp4 -o results/ --mode tiny --keep-audio
 python infer.py -i inputs/example4.mp4 -o results/ --mode tiny-long --tile-dit
@@ -131,7 +135,7 @@ The model path applies to the DiT, LQ projector, and decoder weights. The fixed 
 python batch_inference.py
 ```
 
-This recursively reads the checkout's `inputs/` directory and writes corresponding subdirectories under `results/`. It defaults to tiny mode and 2× scaling. Edit `EXCLUDE_FILES` and `SPECIAL_CONFIGS` in the script for per-file choices. Child processes use the same Python interpreter as the batch program.
+Place your videos in `inputs/`, or download selected samples first. This recursively reads the checkout's `inputs/` directory and writes corresponding subdirectories under `results/`. It defaults to tiny mode and 2× scaling. Edit `EXCLUDE_FILES` and `SPECIAL_CONFIGS` in the script for per-file choices. Child processes use the same Python interpreter as the batch program.
 
 ### Split and rejoin a long video
 
@@ -150,6 +154,8 @@ The worker uses FFmpeg to split the source, calls `infer.py` for each segment wi
 | `batch_inference.py` | Recursive batch processing |
 | `long_video_worker.py` | Segment processing and concatenation |
 | `scripts/install.sh` | Linux/Colab dependency and CUDA extension installation |
+| `scripts/download_samples.py` | Optional sample downloads with size and SHA-256 verification |
+| `inputs/samples.json`, `inputs/README.md` | Pinned sample manifest and download instructions |
 | `colab/FlashVSR_Pro.ipynb` | Colab setup and inference notebook |
 | `diffsynth/pipelines/flashvsr_*.py` | Three inference pipelines |
 | `utils/` | Decoders, audio, tiling, and model loading |
@@ -157,6 +163,11 @@ The worker uses FFmpeg to split the source, calls `infer.py` for each segment wi
 | `models/` | Downloaded weights and bundled prompt tensor |
 | `requirements.txt`, `setup.py` | Python dependencies and package metadata |
 | `INSTALLATION.md` | Setup, model files, updates, and troubleshooting |
+| `THIRD_PARTY.md` | Bundled dependency sources, licenses, and maintenance notes |
+
+Generated CUTLASS HTML documentation and sample video binaries are excluded from the current source tree. See [THIRD_PARTY.md](THIRD_PARTY.md) for upstream documentation and the retained build sources. Vendored CUTLASS files are marked as third-party code for GitHub language statistics.
+
+Use the shallow clone command above for a smaller initial download. Older commits still contain the removed files; this cleanup does not rewrite Git history or reduce an existing checkout's `.git` directory.
 
 ## Troubleshooting
 

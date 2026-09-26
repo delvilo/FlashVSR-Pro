@@ -1,6 +1,6 @@
 """
 This model is copied from https://github.com/Kwai-Kolors/Kolors/tree/master/kolors/models.
-We didn't modify this model.
+The original architecture is retained; platform setup follows the Linux runtime.
 The tensor operation is performed in the prompter.
 """
 
@@ -11,7 +11,6 @@ import math
 import copy
 import warnings
 import re
-import sys
 
 import torch
 import torch.utils.checkpoint
@@ -287,11 +286,10 @@ class ChatGLMConfig(PretrainedConfig):
 
 # flags required to enable jit fusion kernels
 
-if sys.platform != 'darwin':
-    torch._C._jit_set_profiling_mode(False)
-    torch._C._jit_set_profiling_executor(False)
-    torch._C._jit_override_can_fuse_on_cpu(True)
-    torch._C._jit_override_can_fuse_on_gpu(True)
+torch._C._jit_set_profiling_mode(False)
+torch._C._jit_set_profiling_executor(False)
+torch._C._jit_override_can_fuse_on_cpu(True)
+torch._C._jit_override_can_fuse_on_gpu(True)
 
 logger = logging.get_logger(__name__)
 

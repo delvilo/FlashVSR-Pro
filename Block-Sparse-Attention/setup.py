@@ -2,6 +2,10 @@
 # Adapted from https://github.com/Dao-AILab/flash-attention/blob/main/setup.py
 
 import sys
+
+if not sys.platform.startswith("linux"):
+    raise RuntimeError("This FlashVSR-Pro backend supports Linux and Google Colab only.")
+
 import functools
 import warnings
 import os
@@ -55,15 +59,7 @@ def get_platform():
     """
     Returns the platform name as used in wheel filenames.
     """
-    if sys.platform.startswith("linux"):
-        return f'linux_{platform.uname().machine}'
-    elif sys.platform == "darwin":
-        mac_version = ".".join(platform.mac_ver()[0].split(".")[:2])
-        return f"macosx_{mac_version}_x86_64"
-    elif sys.platform == "win32":
-        return "win_amd64"
-    else:
-        raise ValueError("Unsupported platform: {}".format(sys.platform))
+    return f'linux_{platform.machine()}'
 
 
 def get_cuda_bare_metal_version(cuda_dir):
@@ -149,12 +145,12 @@ def append_nvcc_threads(nvcc_extra_args):
 cmdclass = {}
 ext_modules = []
 
-# We want this even if SKIP_CUDA_BUILD because when we run python setup.py sdist we want the .hpp
-# files included in the source distribution, in case the user compiles from source.
-# This repository also ships CUTLASS as regular files. Only fetch it when absent.
+# CUTLASS is vendored as regular files; no submodule checkout is needed.
 if not (Path(this_dir) / "csrc/cutlass/include/cutlass/cutlass.h").is_file():
-    subprocess.run(["git", "submodule", "update", "--init", "csrc/cutlass"],
-                   cwd=this_dir, check=True)
+    raise RuntimeError(
+        "Bundled CUTLASS headers are missing. Restore csrc/cutlass/include "
+        "from a complete FlashVSR-Pro source checkout or source distribution."
+    )
 
 if not SKIP_CUDA_BUILD:
     print("\n\ntorch.__version__  = {}\n\n".format(torch.__version__))
@@ -205,10 +201,6 @@ if not SKIP_CUDA_BUILD:
     ]
 
     compiler_c17_flag=["-O3", "-std=c++17"]
-    # Add Windows-specific flags
-    if sys.platform == "win32" and os.getenv('DISTUTILS_USE_SDK') == '1':
-        nvcc_flags.extend(["-Xcompiler", "/Zc:__cplusplus"])
-        compiler_c17_flag=["-O2", "/std:c++17", "/Zc:__cplusplus"]
 
     ext_modules.append(
         CUDAExtension(
@@ -371,7 +363,7 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: BSD License",
-        "Operating System :: Unix",
+        "Operating System :: POSIX :: Linux",
     ],
     ext_modules=ext_modules,
     cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": NinjaBuildExtension}

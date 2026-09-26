@@ -128,6 +128,11 @@ For the FlashVSR-Pro dependency baseline, follow [the project installation guide
 or run `bash scripts/install.sh` from the FlashVSR-Pro root. It installs the selected
 PyTorch build before compiling this bundled backend with compatible CUDA targets.
 
+This bundled copy targets native Linux and Google Colab. CUTLASS headers are
+included as regular source files; no submodule initialization is needed. See
+[THIRD_PARTY.md](../THIRD_PARTY.md) for source provenance, licenses, and links to
+the generated documentation that is no longer included in the checkout.
+
 Requirements:
 
 - CUDA 11.7 and above for the standalone backend (FlashVSR-Pro uses CUDA 12.4).

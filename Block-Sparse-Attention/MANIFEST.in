@@ -3,6 +3,7 @@ recursive-include csrc *.h
 recursive-include csrc *.cuh
 recursive-include csrc *.cpp
 recursive-include csrc *.hpp
+include csrc/cutlass/LICENSE.txt
 
 recursive-include block_flash_attn *.cu
 recursive-include block_flash_attn *.h
