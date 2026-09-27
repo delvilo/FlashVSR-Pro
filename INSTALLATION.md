@@ -5,8 +5,8 @@ This guide covers direct installation and execution on **native Linux and Google
 ## Requirements
 
 - Linux with an NVIDIA driver and an Ampere, Ada, or Hopper GPU.
-- Python 3.12–3.14. Python 3.12 is the Linux/Colab reference version.
-- CUDA Toolkit **12.5 or newer (12.x)**, including `nvcc`, with PyTorch **2.10.0+cu126**. Toolkit 12.6 matches the PyTorch wheels; compiling with 12.5 or another CUDA 12.x minor version may emit a PyTorch minor-version warning.
+- Python 3.13–3.14. Python 3.13 is the Linux/Colab reference version.
+- CUDA Toolkit **12.8 or newer (12.x)**, including `nvcc`, with PyTorch **2.11.0+cu128**. Toolkit 12.8 matches the PyTorch wheels; compiling with another CUDA 12.x minor version may emit a PyTorch minor-version warning. CUDA 13.x is incompatible with building extensions against cu128 wheels.
 - A C++17 compiler, Git, FFmpeg, and FFprobe.
 - Enough disk space for model weights, build files, input videos, and results.
 - VRAM requirements vary with resolution and duration. Begin with a short clip and `--tile-dit`.
@@ -17,14 +17,14 @@ The bundled attention backend cannot run on Colab T4/P100 GPUs. The pinned setup
 
 ### 1. System packages
 
-For distributions with Python 3.12 packages (for example Ubuntu 24.04):
+For distributions with Python 3.13 packages:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential git git-lfs ffmpeg python3.12-venv python3.12-dev
+sudo apt-get install -y build-essential git git-lfs ffmpeg python3.13-venv python3.13-dev
 ```
 
-Install the NVIDIA driver and CUDA Toolkit using [NVIDIA's Linux installation instructions](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/). CUDA 12.6 matches the wheel when available; CUDA 12.5 and later 12.x toolkits are allowed. Verify:
+Install the NVIDIA driver and CUDA Toolkit using [NVIDIA's Linux installation instructions](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/). CUDA 12.8 matches the wheel; later 12.x toolkits are allowed. Verify:
 
 ```bash
 nvidia-smi
@@ -36,7 +36,7 @@ The CUDA version displayed by `nvidia-smi` describes driver compatibility; `nvcc
 If CUDA is outside `PATH`, set its actual location, for example:
 
 ```bash
-export CUDA_HOME=/usr/local/cuda-12.6
+export CUDA_HOME=/usr/local/cuda-12.8
 export PATH="$CUDA_HOME/bin:$PATH"
 ```
 
@@ -45,12 +45,12 @@ export PATH="$CUDA_HOME/bin:$PATH"
 ```bash
 git clone --depth 1 https://github.com/delvilo/FlashVSR-Pro.git
 cd FlashVSR-Pro
-python3.12 --version
-python3.12 -m venv .venv
+python3.13 --version
+python3.13 -m venv .venv
 source .venv/bin/activate
 ```
 
-If Python 3.12 is unavailable in the system package repository, install it with matching development and venv packages or create a Python 3.12–3.14 Conda environment before installing. Python 3.10 and 3.11 are no longer supported.
+If Python 3.13 is unavailable in the system package repository, install it with matching development and venv packages or create a Python 3.13–3.14 Conda environment before installing. Python 3.12 and earlier are no longer supported.
 
 The sparse attention source and CUTLASS headers are included as regular files in this checkout. No submodule initialization is required. See [THIRD_PARTY.md](THIRD_PARTY.md) for dependency sources and licenses. The shallow clone avoids downloading historical sample binaries and generated documentation; existing Git history is unchanged.
 
@@ -60,7 +60,7 @@ The sparse attention source and CUTLASS headers are included as regular files in
 bash scripts/install.sh
 ```
 
-The installer uses the active `python` interpreter, checks prerequisites, installs PyTorch 2.10.0 from the CUDA 12.6 index, installs the application dependencies, and builds the bundled CUDA extension against that PyTorch installation. The minimal runtime does not require OpenCV, torchvision, torchaudio or Transformers. It creates `inputs/` and `results/`, checks dependency consistency and application imports, and records installed versions in `results/environment.json`. Use a dedicated environment because installation changes its packages.
+The installer uses the active `python` interpreter, checks prerequisites, installs PyTorch 2.11.0 from the CUDA 12.8 index, installs the application dependencies, and builds the bundled CUDA extension against that PyTorch installation. The minimal runtime does not require OpenCV, torchvision, torchaudio or Transformers. It creates `inputs/` and `results/`, checks dependency consistency and application imports, and records installed versions in `results/environment.json`. Use a dedicated environment because installation changes its packages.
 
 To select an explicit interpreter:
 
@@ -74,7 +74,7 @@ Build settings can be overridden:
 MAX_JOBS=2 NVCC_THREADS=2 BLOCK_SPARSE_ATTN_CUDA_ARCHS='80;90' bash scripts/install.sh
 ```
 
-The defaults limit compiler memory usage and select Ampere/Hopper architectures supported by the CUDA 12.5+ baseline. Do not select `100`, `110`, or `120` with a CUDA 12.5/12.6 compiler.
+The defaults limit compiler memory usage and select Ampere/Hopper architectures supported by the CUDA 12.8+ baseline. Blackwell `100`, `110`, or `120` targets require matching hardware and separate GPU acceptance; they are not covered by the default build.
 
 ### 4. Download weights
 
@@ -139,7 +139,7 @@ Choose **Runtime → Change runtime type → GPU**, with an **A100 or L4** when 
 
 The notebook creates `project/.venv` using its Python version, then uses that environment's interpreter for installation, model downloads, inference, and GPU acceptance. This isolates the pinned dependencies from Colab's preinstalled packages. No Conda activation or notebook-kernel restart is needed.
 
-The runtime needs Python 3.12–3.14 and a CUDA 12.5+ toolkit from the 12.x series. If a runtime's Python or toolkit is outside that range, use a compatible runtime or install the baseline environment before proceeding. Check toolkit availability with `nvcc --version`; do not substitute the driver version from `nvidia-smi`.
+The runtime needs Python 3.13–3.14 and a CUDA 12.8+ toolkit from the 12.x series. If a runtime's Python or toolkit is outside that range, use a compatible runtime or install the baseline environment before proceeding. If Colab supplies Python 3.12, select a Python 3.13+ runtime before using the notebook. Check toolkit availability with `nvcc --version`; do not substitute the driver version from `nvidia-smi`.
 
 ### Manual cells
 
@@ -170,7 +170,7 @@ project_python = str(venv / 'bin/python')
 install_env = os.environ.copy()
 install_env['FLASHVSR_PYTHON'] = project_python
 # If needed, select an installed compatible toolkit:
-# install_env['CUDA_HOME'] = '/usr/local/cuda-12.6'
+# install_env['CUDA_HOME'] = '/usr/local/cuda-12.8'
 subprocess.run(['bash', 'scripts/install.sh'], cwd=project, env=install_env, check=True)
 ```
 
@@ -221,7 +221,7 @@ mkdir -p inputs results
 python -m pip check
 ```
 
-Install PyTorch before the other requirements: `requirements-cuda.txt` selects the official cu126 index and exact CUDA wheel versions. `requirements.txt` supplies runtime version pins without an index URL, so package metadata remains valid and CPU wheels can be used for unit tests. `--no-build-isolation` lets the extension compile against the selected PyTorch. Building from the bundled source retains this project's backend changes.
+Install PyTorch before the other requirements: `requirements-cuda.txt` selects the official cu128 index and exact CUDA wheel versions. `requirements.txt` supplies runtime version pins without an index URL, so package metadata remains valid and CPU wheels can be used for unit tests. `--no-build-isolation` lets the extension compile against the selected PyTorch. Building from the bundled source retains this project's backend changes.
 
 ## Package and development layout
 
@@ -230,14 +230,14 @@ Install PyTorch before the other requirements: `requirements-cuda.txt` selects t
 | File | Purpose |
 | --- | --- |
 | `requirements.txt` | Eight pinned direct runtime dependencies |
-| `requirements-cuda.txt` | PyTorch cu126 wheel for inference |
+| `requirements-cuda.txt` | PyTorch cu128 wheel for inference |
 | `requirements-build.txt` | Pinned installer and CUDA build tools |
 | `requirements-dev.txt` | CPU test and package-build tools |
 | `requirements-test-torch.txt` | CPU PyTorch wheels for tests only |
 
-The reference combination is Python **3.12.x**, PyTorch **2.10.0+cu126**, and CUDA Toolkit **12.6.x**; Toolkit 12.5 and other 12.x versions are accepted for Colab and Linux. PyTorch's extension builder warns when `nvcc` and its wheels use different CUDA 12.x minor versions. CPU CI covers Python 3.12–3.14. Other direct Python dependencies and build tools use recent compatible pins; upgrading PyTorch further needs real GPU compilation and inference validation of the bundled extension. Direct pins do not lock the Linux driver, system libraries, or every transitive dependency. Keep the generated environment report with GPU acceptance results when reproducing a run.
+The reference combination is Python **3.13.x**, PyTorch **2.11.0+cu128**, and CUDA Toolkit **12.8.x**; later 12.x toolkits are accepted for Colab and Linux. PyTorch's extension builder warns when `nvcc` and its wheels use different CUDA 12.x minor versions. CPU CI covers Python 3.13–3.14. Other direct Python dependencies and build tools use recent compatible pins; upgrading PyTorch further needs real GPU compilation and inference validation of the bundled extension. Direct pins do not lock the Linux driver, system libraries, or every transitive dependency. Keep the generated environment report with GPU acceptance results when reproducing a run.
 
-The CUDA wheel versions follow the [official PyTorch 2.10 installation matrix](https://pytorch.org/get-started/previous-versions/). Unused generation, training, tokenizer, OpenCV and audio-framework packages have been removed from the application requirements.
+The CUDA wheel versions are available from the [official PyTorch CUDA 12.8 wheel index](https://download.pytorch.org/whl/cu128/torch/). Unused generation, training, tokenizer, OpenCV and audio-framework packages have been removed from the application requirements.
 
 The wheel provides the `flashvsr` console command, library modules, model manifest and fixed prompt; installed commands work outside the checkout. Large model weights and the compiled attention backend remain separate. The source distribution additionally includes legacy scripts, tests, the Colab notebook and CUDA build sources. The installation script uses an editable checkout for development. See [TESTING.md](TESTING.md) for building and validating both distributions.
 
@@ -259,7 +259,7 @@ After updating from a version that bundled sample videos, run `python scripts/do
 ### CUDA or extension build errors
 
 - Check `nvcc --version`, `CUDA_HOME`, and `python -c "import torch; print(torch.__version__, torch.version.cuda)"`.
-- Ensure the selected compiler is CUDA 12.5 or newer within the 12.x series. A 12.x minor mismatch with the cu126 wheel produces a PyTorch warning; CUDA 13.x is unsupported by this baseline.
+- Ensure the selected compiler is CUDA 12.8 or newer within the 12.x series. A 12.x minor mismatch with the cu128 wheel produces a PyTorch warning; CUDA 13.x is unsupported by this baseline.
 - If compilation is killed because RAM is exhausted, rerun with `MAX_JOBS=1 NVCC_THREADS=1`.
 - If the compiler rejects a GPU architecture, use `BLOCK_SPARSE_ATTN_CUDA_ARCHS='80;90'` with the baseline toolkit.
 - If imports report undefined symbols, rerun the installer in the same Python environment used for inference to rebuild the extension.

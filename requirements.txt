@@ -1,6 +1,6 @@
-# Minimal FlashVSR runtime. Install cu126 torch first using requirements-cuda.txt.
-# Public pins also accept CPU wheels for testing. Inference requires cu126.
-torch==2.10.0
+# Minimal FlashVSR runtime. Install cu128 torch first using requirements-cuda.txt.
+# Public pins also accept CPU wheels for testing. Inference requires cu128.
+torch==2.11.0
 einops==0.8.2
 numpy==2.5.3
 pillow==12.3.0

@@ -6,10 +6,10 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<'HELP'
 Usage: bash scripts/install.sh
 
-Linux: activate a Python 3.12, 3.13 or 3.14 virtual environment first.
+Linux: activate a Python 3.13 or 3.14 virtual environment first.
 Colab: select an Ampere/Ada/Hopper GPU runtime and use the notebook instructions.
-Install an NVIDIA driver, CUDA Toolkit 12.5 or newer (12.x), a C++ compiler, FFmpeg and Git first.
-The supported build uses PyTorch 2.10.0+cu126 and CUDA Toolkit 12.5+ (12.x).
+Install an NVIDIA driver, CUDA Toolkit 12.8 or newer (12.x), a C++ compiler, FFmpeg and Git first.
+The supported build uses PyTorch 2.11.0+cu128 and CUDA Toolkit 12.8+ (12.x).
 
 Environment overrides:
   FLASHVSR_PYTHON               Python executable (default: python)
@@ -52,7 +52,7 @@ PY
 
 if [[ -z "${CUDA_HOME:-}" ]]; then
     if ! command -v nvcc >/dev/null 2>&1; then
-        echo "nvcc not found. Install CUDA Toolkit 12.5+ (12.x) and set CUDA_HOME." >&2
+        echo "nvcc not found. Install CUDA Toolkit 12.8+ (12.x) and set CUDA_HOME." >&2
         exit 1
     fi
     CUDA_HOME="$(dirname -- "$(dirname -- "$(readlink -f -- "$(command -v nvcc)")")")"
@@ -85,7 +85,7 @@ PY
 "$python_bin" -m pip install -r requirements.txt
 "$python_bin" -m pip install --no-build-isolation --no-deps -e .
 
-# The default targets are Ampere/Hopper; building sm_120 needs a newer toolkit and GPU validation.
+# The default targets are Ampere/Hopper; building sm_120 needs a compatible GPU and validation.
 export BLOCK_SPARSE_ATTN_CUDA_ARCHS="${BLOCK_SPARSE_ATTN_CUDA_ARCHS:-80;90}"
 export MAX_JOBS="${MAX_JOBS:-2}"
 export NVCC_THREADS="${NVCC_THREADS:-2}"

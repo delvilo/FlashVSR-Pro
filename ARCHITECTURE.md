@@ -1,7 +1,7 @@
 # FlashVSR application architecture
 
-This fork contains a FlashVSR-only DiffSynth subset. Python 3.12–3.14, PyTorch
-2.10.0+cu126 and CUDA Toolkit 12.5+ within 12.x remain the supported baseline.
+This fork contains a FlashVSR-only DiffSynth subset. Python 3.13–3.14, PyTorch
+2.11.0+cu128 and CUDA Toolkit 12.8+ within 12.x are the supported baseline.
 
 ## Execution flow
 

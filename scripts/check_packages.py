@@ -35,7 +35,7 @@ def main():
         dependencies = metadata.get_all('Requires-Dist')
         if any(item.split('=')[0] in {'opencv-python', 'opencv-python-headless', 'transformers', 'modelscope', 'torchvision', 'torchaudio'} for item in dependencies):
             raise RuntimeError('Unused dependencies leaked into wheel metadata')
-        if metadata['Requires-Python'] != '<3.15,>=3.12':
+        if metadata['Requires-Python'] != '<3.15,>=3.13':
             raise RuntimeError('Unexpected Python version range in wheel metadata')
     print(f'Distributions verified: {archive.name}, {wheel.name}')
 

@@ -5,6 +5,8 @@ import sys
 
 if not sys.platform.startswith("linux"):
     raise RuntimeError("This FlashVSR-Pro backend supports Linux and Google Colab only.")
+if not (3, 13) <= sys.version_info[:2] < (3, 15):
+    raise RuntimeError("This FlashVSR-Pro backend requires Python 3.13–3.14.")
 
 import functools
 import warnings
@@ -160,18 +162,20 @@ if not (Path(this_dir) / "csrc/cutlass/include/cutlass/cutlass.h").is_file():
 
 if not SKIP_CUDA_BUILD:
     print("\n\ntorch.__version__  = {}\n\n".format(torch.__version__))
+    if torch.__version__ != "2.11.0+cu128" or torch.version.cuda != "12.8":
+        raise RuntimeError("Build the backend against PyTorch 2.11.0+cu128; see INSTALLATION.md.")
     TORCH_MAJOR = int(torch.__version__.split(".")[0])
     TORCH_MINOR = int(torch.__version__.split(".")[1])
 
     check_if_cuda_home_none("block_sparse_attn")
-    # Check, if CUDA11 is installed for compute capability 8.0
+    # Require a compiler compatible with the cu128 PyTorch extension builder.
     cc_flag = []
     if CUDA_HOME is not None:
         _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
-        if bare_metal_version < Version("11.7"):
+        if not Version("12.8") <= bare_metal_version < Version("13.0"):
             raise RuntimeError(
-                "Block Sparse Attention is only supported on CUDA 11.7 and above.  "
-                "Note: make sure nvcc has a supported version by running nvcc -V."
+                "Use CUDA Toolkit 12.8 or newer within 12.x when building "
+                "against PyTorch 2.11.0+cu128; check nvcc -V."
             )
         # Build -gencode (regular + PTX + family-specific 'f' when available)
         add_cuda_gencodes(cc_flag, set(cuda_archs()), bare_metal_version)
@@ -378,9 +382,9 @@ setup(
     else {
         "bdist_wheel": CachedWheelsCommand,
     },
-    python_requires=">=3.12,<3.15",
+    python_requires=">=3.13,<3.15",
     install_requires=[
-        "torch==2.10.0",
+        "torch==2.11.0",
         "einops==0.8.2",
     ],
 )

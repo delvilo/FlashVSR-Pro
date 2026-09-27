@@ -7,7 +7,7 @@ name = "diffsynth"
 version = "1.2.0"
 description = "FlashVSR-Pro inference, model management and minimal DiffSynth runtime"
 readme = "README.md"
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.13,<3.15"
 license = "Apache-2.0"
 license-files = ["LICENSE", "Block-Sparse-Attention/LICENSE", "Block-Sparse-Attention/csrc/cutlass/LICENSE.txt"]
 authors = [{name = "Artiprocher"}]

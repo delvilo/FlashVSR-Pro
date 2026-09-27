@@ -4,7 +4,7 @@ The CPU suite checks installation metadata, arguments, missing or corrupt weight
 
 ## CPU environment
 
-From a checkout using Linux and Python 3.12–3.14:
+From a checkout using Linux and Python 3.13–3.14:
 
 ```bash
 python3 -m venv .venv-test
@@ -23,11 +23,11 @@ The tests cover safe sample downloads, invalid CLI parameters, help before depen
 
 `check_packages.py` inspects the built wheel and source archive, checking package metadata, the model manifest, packaged prompt, CLI, CUDA sources, licenses, and absence of tokenizer data. The installed CLI also works outside the checkout, with the separately compiled backend; see [INSTALLATION.md](INSTALLATION.md#package-and-development-layout).
 
-The `Linux CPU checks` workflow runs the tests, builds both distributions, installs application dependencies with CPU wheels, and runs `pip check` on Python 3.12, 3.13 and 3.14. The installer is not fully executed on a CPU runner; its preflight failures are tested. CUDA extension compilation belongs to GPU acceptance.
+The `Linux CPU checks` workflow runs the tests, builds both distributions, installs application dependencies with CPU wheels, and runs `pip check` on Python 3.13 and 3.14. The installer is not fully executed on a CPU runner; its preflight failures are tested. CUDA extension compilation belongs to GPU acceptance.
 
 ## Real GPU acceptance
 
-Use native Linux or the provided Colab notebook with an Ampere/Ada/Hopper GPU, CUDA Toolkit 12.5+ (12.x), the installed backend, and all model weights. The reference Python version is 3.12; Python 3.13 and 3.14 are included in the CPU CI. Toolkit 12.5 with cu126 wheels produces a minor-version warning during extension compilation; GPU acceptance is needed to verify that combination on the actual hardware.
+Use native Linux or the provided Colab notebook with an Ampere/Ada/Hopper GPU, CUDA Toolkit 12.8+ (12.x), the installed backend, and all model weights. The reference Python version is 3.13; Python 3.13 and 3.14 are included in the CPU CI. Toolkit 12.9 with cu128 wheels may produce a minor-version warning during extension compilation; GPU acceptance is needed to verify that combination on the actual hardware.
 
 ```bash
 bash scripts/install.sh
@@ -43,7 +43,7 @@ A passing run requires all three outputs to have **256×192 pixels, 17 frames, 8
 
 This is a correctness and memory baseline for a small synthetic input, not a visual-quality benchmark or a guarantee that longer/higher-resolution videos fit in VRAM. Compare runs on the same GPU, toolkit, weights, mode settings, and input before drawing performance conclusions. Metrics include model loading and preprocessing in peak memory; inference timing is synchronized with CUDA.
 
-The Colab notebook has an optional final acceptance cell. The manually dispatched `GPU acceptance` workflow uses a runner labeled `self-hosted`, `linux`, `x64`, and `flashvsr-gpu`. Configure that runner's Python, CUDA 12.5+ toolkit (12.x), and `FLASHVSR_MODEL_PATH` pointing to verified weights (including `posi_prompt.pth`) outside the checkout. Run `flashvsr models download --mode all` once using that directory. The workflow installs/builds the project and uploads reports and logs even if validation fails. GPU jobs do not run automatically for pull requests.
+The Colab notebook has an optional final acceptance cell. The manually dispatched `GPU acceptance` workflow uses a runner labeled `self-hosted`, `linux`, `x64`, and `flashvsr-gpu`. Configure that runner's Python 3.13 or 3.14, CUDA 12.8+ toolkit (12.x), and `FLASHVSR_MODEL_PATH` pointing to verified weights (including `posi_prompt.pth`) outside the checkout. Run `flashvsr models download --mode all` once using that directory. The workflow installs/builds the project and uploads reports and logs even if validation fails. GPU jobs do not run automatically for pull requests.
 
 A CPU test pass or a supplied GPU script is **not a GPU acceptance result**. Publish the generated report only after running it on actual supported hardware.
 

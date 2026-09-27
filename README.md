@@ -20,9 +20,9 @@ FlashVSR-Pro supports direct Python execution on **native Linux and Google Colab
 | Component | Baseline |
 | --- | --- |
 | System | Linux; Google Colab with a compatible GPU runtime |
-| Python | 3.12.x reference; 3.13.x and 3.14.x compatibility targets |
-| PyTorch | 2.10.0 with CUDA 12.6 wheels |
-| CUDA Toolkit | 12.5 or newer (12.x); 12.6 matches the cu126 wheels |
+| Python | 3.13.x reference; 3.14.x compatibility target |
+| PyTorch | 2.11.0+cu128 (CUDA 12.8 wheels) |
+| CUDA Toolkit | 12.8 or newer (12.x); 12.8 matches the cu128 wheels |
 | GPU | NVIDIA Ampere, Ada, or Hopper: for example RTX 3090/4090, A100, H100, or L4 |
 | Build tools | C++17 compiler, Ninja, packaging, and wheel |
 | Video tools | FFmpeg and FFprobe on `PATH` |
@@ -35,23 +35,23 @@ Windows, macOS, and WSL 2 are not supported. Project build scripts target Linux;
 
 Install an NVIDIA driver and the CUDA Toolkit using [NVIDIA's Linux installation guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/). The toolkit supplies `nvcc`; PyTorch wheels alone do not supply the compiler.
 
-On a Linux distribution with Python 3.12 development and venv packages (for example Ubuntu 24.04), install system dependencies and create a Python environment:
+On a Linux distribution with Python 3.13 development and venv packages, install system dependencies and create a Python environment:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential git git-lfs ffmpeg python3.12-venv python3.12-dev
+sudo apt-get install -y build-essential git git-lfs ffmpeg python3.13-venv python3.13-dev
 
 git clone --depth 1 https://github.com/delvilo/FlashVSR-Pro.git
 cd FlashVSR-Pro
 
-# Use Python 3.12 (and its matching venv/dev packages) if the system Python differs.
-python3.12 -m venv .venv
+# Use Python 3.13 (and its matching venv/dev packages) if the system Python differs.
+python3.13 -m venv .venv
 source .venv/bin/activate
 bash scripts/install.sh
 ```
 
 An existing Conda environment with a supported Python version can also be used. Activate it before invoking the installer; all subprocesses use the selected Python environment.
-On distributions without Python 3.12 packages, install a matching interpreter and headers first or use a Python 3.12–3.14 Conda environment.
+On distributions without Python 3.13 packages, install a matching interpreter and headers first or use a Python 3.13–3.14 Conda environment. CUDA 13.x toolkits are not supported with the pinned cu128 wheel; select a CUDA 12.8+ toolkit within the 12.x series.
 
 Download and verify the model weights in the versioned cache:
 

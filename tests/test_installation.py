@@ -25,7 +25,7 @@ class InstallationTests(unittest.TestCase):
         self.assertFalse(set(names) & {'pip', 'setuptools', 'wheel', 'ninja', 'build', 'transformers', 'modelscope', 'torchvision', 'torchaudio', 'pandas'})
         metadata = tomllib.loads((PROJECT / 'pyproject.toml').read_text())
         self.assertEqual(metadata['tool']['setuptools']['dynamic']['dependencies']['file'], ['requirements.txt'])
-        self.assertEqual(metadata['project']['requires-python'], '>=3.12,<3.15')
+        self.assertEqual(metadata['project']['requires-python'], '>=3.13,<3.15')
 
     def test_installer_help_and_usage(self):
         help_result = subprocess.run(['bash', str(PROJECT / 'scripts/install.sh'), '--help'], capture_output=True)
@@ -39,7 +39,7 @@ class InstallationTests(unittest.TestCase):
             bin_dir = root / 'bin'
             bin_dir.mkdir()
             nvcc = bin_dir / 'nvcc'
-            nvcc.write_text('#!/bin/sh\necho "Cuda compilation tools, release 12.4, V12.4.0"\n')
+            nvcc.write_text('#!/bin/sh\necho "Cuda compilation tools, release 12.7, V12.7.0"\n')
             nvcc.chmod(0o755)
             log = root / 'pip-was-called'
             wrapper = root / 'selected-python'
@@ -55,7 +55,7 @@ class InstallationTests(unittest.TestCase):
                        PATH=str(bin_dir) + os.pathsep + os.environ['PATH'])
             result = subprocess.run(['bash', str(PROJECT / 'scripts/install.sh')], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('Toolkit 12.5', result.stderr)
+            self.assertIn('Toolkit 12.8', result.stderr)
             self.assertFalse(log.exists())
 
 
