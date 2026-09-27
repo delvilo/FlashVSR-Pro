@@ -13,6 +13,8 @@ import os
 
 from utils.TCDecoder import build_tcdecoder, TAEW2_1DiffusersWrapper, TAEHV
 from utils.tile_utils import vae_decode_tiled
+from utils.runtime import require_weight
+from utils.weights import read_checkpoint, load_checked_state_dict
 
 
 class VAESystem:
@@ -55,20 +57,9 @@ class VAESystem:
         """Load specified VAE model."""
         vae_type = vae_type.lower()
         if vae_type not in self.VAE_CONFIGS:
-             # Fallback logic if needed or raise error
-             if mode == 'full':
-                 vae_type = 'wan2.1'
-             else:
-                 vae_type = 'tcd'
-             
-             if vae_type not in self.VAE_CONFIGS: # Should not happen
-                raise ValueError(
-                    f"Unsupported VAE type: '{vae_type}'. "
-                    f"Available: {list(self.VAE_CONFIGS.keys())}"
-                )
+            raise ValueError(f"Unsupported VAE type: {vae_type}")
 
         config = self.VAE_CONFIGS[vae_type]
-        self.current_type = vae_type
 
         # Determine weight path
         if weight_path is None:
@@ -79,13 +70,7 @@ class VAESystem:
              else:
                 weight_path = None # tcd has no weight path
 
-        if weight_path and not os.path.exists(weight_path):
-            warnings.warn(
-                f"VAE weights not found: {weight_path}. "
-                f"Model '{vae_type}' may not load correctly."
-            )
-
-        # print(f"Loading VAE: {vae_type}")
+        require_weight(weight_path)
 
         # Load model based on type
         if config["is_tcdecoder"]:
@@ -93,7 +78,9 @@ class VAESystem:
         else:
             vae_model = self._load_wan_vae(vae_type, config, weight_path, mode)
 
+        vae_model.eval()
         self.current_vae = vae_model
+        self.current_type = vae_type
 
         # Enable tiling if requested
         if tile_vae and hasattr(vae_model, 'decode'):
@@ -229,20 +216,10 @@ class WanVAELoader:
         if not weight_path or not os.path.exists(weight_path):
             raise FileNotFoundError(f"VAE weights not found: {weight_path}")
 
-        # Load checkpoint
-        if weight_path.endswith('.safetensors'):
-            from safetensors.torch import load_file
-            state_dict = load_file(weight_path, device='cpu')
-        else:
-            checkpoint = torch.load(weight_path, map_location='cpu', weights_only=False)
-            if 'state_dict' in checkpoint:
-                state_dict = checkpoint['state_dict']
-            elif isinstance(checkpoint, dict):
-                state_dict = checkpoint
-            else:
-                raise ValueError("Cannot extract state_dict from checkpoint")
+        state_dict = read_checkpoint(weight_path)
 
         # Detect architecture from state_dict keys
+        state_dict = {k.removeprefix('model.'): v for k, v in state_dict.items()}
         keys = list(state_dict.keys())
 
         # Wan VAEs have specific key patterns
@@ -260,13 +237,13 @@ class WanVAELoader:
 
         # Add 'model.' prefix to match WanVideoVAE state_dict keys
         state_dict = {f"model.{k}": v for k, v in state_dict.items()}
-        # Load state dict
-        missing, unexpected = vae_model.load_state_dict(state_dict, strict=False)
-
-        if missing:
-            warnings.warn(f"Missing keys in {vae_type}: {missing[:3]}...")
-        if unexpected:
-            warnings.warn(f"Unexpected keys in {vae_type}: {unexpected[:3]}...")
+        # Inference discards the encoder and quantization convolution. Every
+        # retained decoder parameter must be present and have the correct shape.
+        load_checked_state_dict(
+            vae_model, state_dict, weight_path,
+            allowed_missing=("model.encoder.", "model.conv1."),
+        )
+        vae_model.eval()
 
         return vae_model
 
@@ -280,34 +257,15 @@ class TCDVAELoader:
         if channels is None:
             channels = [512, 256, 128, 128]  # Default for tcd
 
-        # Build TCDecoder with appropriate channels
-        latent_channels = 16 + 768  # TCD specific
+        # Validate and load on CPU before allocating any GPU memory.
+        state_dict = read_checkpoint(weight_path)
+        latent_channels = 16 + 768
         tcdecoder = build_tcdecoder(
-            new_channels=channels,
-            new_latent_channels=latent_channels
+            new_channels=channels, new_latent_channels=latent_channels,
+            device="cpu", dtype=torch.float32,
         )
-
-        # Load weights if available
-        if weight_path and os.path.exists(weight_path):
-            try:
-                if weight_path.endswith('.safetensors'):
-                    from safetensors.torch import load_file
-                    state_dict = load_file(weight_path, device='cpu')
-                else:
-                    checkpoint = torch.load(weight_path, map_location='cpu', weights_only=False)
-                    if 'state_dict' in checkpoint:
-                        state_dict = checkpoint['state_dict']
-                    elif isinstance(checkpoint, dict):
-                        state_dict = checkpoint
-                    else:
-                        raise ValueError("Cannot extract state_dict from checkpoint")
-
-                missing, unexpected = tcdecoder.load_state_dict(state_dict, strict=False)
-                if missing or unexpected:
-                    warnings.warn(f"TCD weight loading: {len(missing)} missing, {len(unexpected)} unexpected keys")
-
-            except Exception as e:
-                warnings.warn(f"Failed to load weights for {vae_type}: {e}")
+        load_checked_state_dict(tcdecoder, state_dict, weight_path)
+        tcdecoder.eval()
 
         # Wrap for pipeline compatibility
         class TCDecoderWrapper(nn.Module):
@@ -355,7 +313,7 @@ class TCDVAELoader:
                     self.tcd_model = self.tcd_model.to(dtype)
                 return self
 
-        return TCDecoderWrapper(tcdecoder, "cuda", torch.bfloat16)
+        return TCDecoderWrapper(tcdecoder, "cpu", torch.float32)
 
 
 class VAELoaderFactory:

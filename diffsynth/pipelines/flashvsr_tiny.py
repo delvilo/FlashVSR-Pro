@@ -242,7 +242,9 @@ class FlashVSRTinyPipeline(BasePipeline):
         if context_tensor is None:
             if prompt_path is None:
                 raise ValueError("init_cross_kv: Either prompt_path or context_tensor must be provided")
-            ctx = torch.load(prompt_path, map_location=self.device)
+            ctx = torch.load(prompt_path, map_location=self.device, weights_only=True)
+            if not isinstance(ctx, torch.Tensor) or ctx.numel() == 0:
+                raise ValueError(f"Invalid prompt tensor: {prompt_path}")
         else:
             ctx = context_tensor
 
@@ -592,8 +594,7 @@ class FlashVSRTinyPipeline(BasePipeline):
                         method='adain'
                     )
             except Exception as e:
-                print(f"[ColorFix Error] {e}")
-                pass
+                raise RuntimeError(f"Color correction failed: {e}") from e
 
         return frames[0]
 

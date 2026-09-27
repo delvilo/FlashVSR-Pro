@@ -1,0 +1,24 @@
+name: GPU acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  three-modes:
+    # A maintainer supplies a runner with the pinned Python/CUDA environment and weights.
+    runs-on: [self-hosted, linux, x64, flashvsr-gpu]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned runtime and compile the bundled backend
+        run: bash scripts/install.sh
+      - name: Run real inference in full, tiny and tiny-long modes
+        run: python scripts/validate_gpu.py --output-dir results/gpu-validation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gpu-acceptance
+          path: results/gpu-validation/

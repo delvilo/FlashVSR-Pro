@@ -94,3 +94,6 @@ temp_work_*/
 
 # Incomplete sample downloads
 /inputs/**/*.part
+
+# Isolated CPU test environment
+.venv-test/

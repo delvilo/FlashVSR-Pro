@@ -1,0 +1,14 @@
+include requirements*.txt
+include README.md INSTALLATION.md THIRD_PARTY.md TESTING.md
+include infer.py batch_inference.py long_video_worker.py
+recursive-include scripts *.py *.sh
+recursive-include tests *.py
+recursive-include colab *.ipynb
+recursive-include inputs *.json *.md
+recursive-include models/prompt_tensor *.pth
+include Block-Sparse-Attention/setup.py Block-Sparse-Attention/pyproject.toml
+include Block-Sparse-Attention/MANIFEST.in Block-Sparse-Attention/LICENSE Block-Sparse-Attention/README.md
+recursive-include Block-Sparse-Attention/block_sparse_attn *.py
+recursive-include Block-Sparse-Attention/csrc *.cpp *.cu *.h *.cuh *.hpp
+include Block-Sparse-Attention/csrc/cutlass/LICENSE.txt
+global-exclude *.py[cod]

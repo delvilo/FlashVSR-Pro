@@ -1,0 +1,7 @@
+# Build dependencies, kept out of the application dependency metadata.
+pip==26.2.1
+setuptools==84.0.0
+wheel==0.48.0
+packaging==26.3
+ninja==1.13.2
+psutil==7.2.2

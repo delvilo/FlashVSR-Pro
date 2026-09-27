@@ -1,115 +1,83 @@
-import os
-import subprocess
-import shutil
+"""Split, process and verify a long video before publishing the merged output."""
+
 import argparse
-import sys
 from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
 
-def main():
-    parser = argparse.ArgumentParser(description="Process ultra-long videos by chunking")
-    parser.add_argument("-i", "--input", required=True, help="Input video path")
-    parser.add_argument("-o", "--output_dir", required=True, help="Output directory")
-    parser.add_argument("--segment_time", type=str, default="00:01:00", help="Split segment time (HH:MM:SS), default 1 minute")
-    parser.add_argument("--mode", default="tiny", help="Inference mode")
-    parser.add_argument("--scale", default="2.0", help="Scale factor")
-    
-    args = parser.parse_args()
-    
-    project_dir = Path(__file__).resolve().parent
-    input_path = Path(args.input).expanduser().resolve()
-    video_name = input_path.stem
-    work_dir = Path(f"temp_work_{video_name}")
-    split_dir = work_dir / "splits"
-    processed_dir = work_dir / "processed"
-    
-    if work_dir.exists():
-        shutil.rmtree(work_dir)
-    split_dir.mkdir(parents=True)
-    processed_dir.mkdir(parents=True)
+from utils.cli import MODES, positive_float, run_cli, segment_seconds, validate_input
+from utils.media import MediaTools
 
-    print(f"=== Step 1: Splitting video {input_path} ===")
-    # 1. Split video into chunks using ffmpeg
-    # -c copy ensures zero generation loss during splitting
-    # -map 0 ensures all streams are kept
-    split_cmd = [
-        "ffmpeg", "-i", str(input_path),
-        "-c", "copy",
-        "-map", "0",
-        "-segment_time", args.segment_time,
-        "-f", "segment",
-        "-reset_timestamps", "1",
-        str(split_dir / f"{video_name}_part%03d.mp4")
-    ]
-    subprocess.run(split_cmd, check=True)
+PROJECT_DIR = Path(__file__).resolve().parent
 
-    files = sorted(list(split_dir.glob("*.mp4")))
-    print(f"Split into {len(files)} chunks.")
 
-    processed_files = []
+def _main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-i", "--input", required=True)
+    parser.add_argument("-o", "--output-dir", "--output_dir", dest="output_dir", required=True, type=Path)
+    parser.add_argument("--segment-time", "--segment_time", dest="segment_time", type=segment_seconds, default=60.0)
+    parser.add_argument("--mode", choices=MODES, default="tiny")
+    parser.add_argument("--scale", type=positive_float, default=2.0)
+    parser.add_argument("--keep-temp", action="store_true", help="Keep this run's temporary segments for diagnosis")
+    args = parser.parse_args(argv)
+    source = validate_input(args.input)
+    if not source.is_file():
+        raise ValueError("The long-video worker requires a video file")
+    destination = args.output_dir.expanduser().resolve() / f"FlashVSR_{source.stem}_Final.mp4"
+    if source == destination:
+        raise ValueError("Input and output must be different files")
+    media = MediaTools()
+    original = media.verify_video(source)
+    width, height = round(original['width'] * args.scale), round(original['height'] * args.scale)
+    if min(width, height) < 1:
+        raise ValueError("Scaled dimensions must be at least one pixel")
+    work = Path(tempfile.mkdtemp(prefix="flashvsr-segments-"))
+    print(f"Temporary directory: {work}", flush=True)
+    try:
+        splits, processed = work / "splits", work / "processed"
+        splits.mkdir()
+        processed.mkdir()
+        media.run(["-i", source, "-map", "0:v:0", "-map", "0:a?", "-c", "copy",
+                   "-segment_time", str(args.segment_time), "-f", "segment",
+                   "-reset_timestamps", "1", splits / "segment_%06d.mp4"])
+        parts = sorted(splits.glob("*.mp4"))
+        if not parts:
+            raise RuntimeError("FFmpeg produced no segments")
+        input_frames = 0
+        outputs = []
+        for index, part in enumerate(parts):
+            info = media.verify_video(part)
+            input_frames += info['frames']
+            output = processed / part.name
+            print(f"Processing segment {index + 1}/{len(parts)}", flush=True)
+            result = subprocess.run([
+                sys.executable, str(PROJECT_DIR / "infer.py"), "-i", str(part), "-o", str(output),
+                "--mode", args.mode, "--scale", str(args.scale), "--keep-audio",
+            ])
+            if result.returncode in (130, -2):
+                raise KeyboardInterrupt
+            if result.returncode:
+                raise RuntimeError(f"Segment {index + 1} inference exited {result.returncode}")
+            media.verify_video(output, width=width, height=height, frames=info['frames'],
+                               fps=info['fps'], audio_streams=info['audio_streams'])
+            outputs.append(output)
+        if input_frames != original['frames']:
+            raise RuntimeError(f"Splitting changed frame count: {original['frames']} -> {input_frames}")
+        media.concat_videos(outputs, destination)
+        print(f"Done! Output: {destination}")
+        return 0
+    finally:
+        if args.keep_temp:
+            print(f"Kept temporary files: {work}")
+        else:
+            shutil.rmtree(work)
 
-    print(f"=== Step 2: Processing chunks with FlashVSR-Pro ===")
-    for i, file_path in enumerate(files):
-        print(f"Processing chunk {i+1}/{len(files)}: {file_path.name}")
-        
-        # Process output will be in processed_dir
-        # We need to calculate where infer.py puts the result based on your logic
-        # But to be safe, we let infer.py output to processed_dir
-        
-        # Using Tile-DiT is crucial for 1080p chunks
-        cmd = [
-            sys.executable, str(project_dir / "infer.py"),
-            "-i", str(file_path),
-            "-o", str(processed_dir),
-            "--mode", args.mode,
-            "--scale", args.scale,
-            # "--tile-dit", 
-            # "--tile-size", "256", 
-            # "--overlap", "24",
-            "--keep-audio" # Always keep audio for chunks so merge works
-        ]
-        
-        subprocess.run(cmd, check=True)
-        
-        # Find the result file (assuming infer.py generates only one file in that dir per input)
-        # Note: FlashVSR-Pro creates complex filenames, we need to find the latest created file matching input
-        # Specific search rule for robustness:
-        candidates = list(processed_dir.glob(f"*{file_path.stem}*.mp4"))
-        if not candidates:
-             print(f"Error: Could not find output for {file_path.name}")
-             exit(1)
-        # Pick the one that looks most like an output (not the input if copied)
-        output_chunk = candidates[0]
-        processed_files.append(output_chunk)
-        
-        # Optional: delete input chunk to save space
-        # file_path.unlink()
 
-    print(f"=== Step 3: Merging processed chunks ===")
-    
-    # Create file list for ffmpeg concat
-    list_file = work_dir / "concat_list.txt"
-    with open(list_file, "w") as f:
-        for p in processed_files:
-            f.write(f"file '{p.absolute()}'\n")
-            
-    final_output = Path(args.output_dir) / f"FlashVSR_{video_name}_Final.mp4"
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    
-    # Merge
-    # -c copy ensures no re-encoding quality loss
-    merge_cmd = [
-        "ffmpeg", "-f", "concat",
-        "-safe", "0",
-        "-i", str(list_file),
-        "-c", "copy",
-        str(final_output)
-    ]
-    subprocess.run(merge_cmd, check=True)
-    
-    print(f"=== Done! Final video saved to: {final_output} ===")
-    
-    # Cleanup
-    # shutil.rmtree(work_dir)
+def main(argv=None):
+    return run_cli(_main, argv)
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
