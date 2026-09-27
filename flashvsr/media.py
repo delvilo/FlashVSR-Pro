@@ -10,6 +10,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -57,6 +58,31 @@ class MediaTools:
     def __init__(self, ffmpeg=None, ffprobe=None):
         self.ffmpeg = _executable(ffmpeg or os.getenv("FLASHVSR_FFMPEG"), "ffmpeg")
         self.ffprobe = _executable(ffprobe or os.getenv("FLASHVSR_FFPROBE"), "ffprobe")
+        try:
+            result = subprocess.run([self.ffmpeg, "-version"], capture_output=True, text=True,
+                                    check=True, timeout=10)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise MediaError(f"Cannot determine FFmpeg version: {error}") from error
+        version_output = result.stdout or result.stderr
+        self.ffmpeg_version = version_output.splitlines()[0].strip()
+        match = re.search(r"\bversion\s+n?(\d+)\.(\d+)(?:\.(\d+))?", self.ffmpeg_version)
+        self.ffmpeg_release = tuple(map(int, match.groups(default="0"))) if match else None
+        # -fps_mode was introduced in 5.1; older releases use the equivalent
+        # -vsync numeric mode. Keep the selected executable and its options paired.
+        if self.ffmpeg_release is None:
+            try:
+                help_result = subprocess.run([self.ffmpeg, "-hide_banner", "-h", "full"],
+                                             capture_output=True, text=True, timeout=10)
+                self.supports_fps_mode = "-fps_mode" in (help_result.stdout + help_result.stderr)
+            except (OSError, subprocess.SubprocessError):
+                self.supports_fps_mode = False
+        else:
+            self.supports_fps_mode = self.ffmpeg_release >= (5, 1, 0)
+        logger.info("Using %s", self.ffmpeg_version)
+
+    def cfr_arguments(self):
+        """Return the constant-frame-rate option supported by this FFmpeg."""
+        return ["-fps_mode", "cfr"] if self.supports_fps_mode else ["-vsync", "1"]
 
     def run(self, arguments, timeout=None):
         try:
@@ -160,6 +186,8 @@ class MediaTools:
             ]
         else:
             arguments += ["-an"]
+        if output.suffix.lower() != ".gif":
+            arguments += self.cfr_arguments()
         if output.suffix.lower() in (".mp4", ".mov"):
             arguments += ["-movflags", "+faststart"]
         arguments.append(str(output))

@@ -28,6 +28,26 @@ class MediaTests(unittest.TestCase):
                         '-map', '0:v', '-map', '1:a', '-map', '2:a',
                         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', self.source])
 
+    def test_frame_sync_options_match_ffmpeg_generation(self):
+        self.assertRegex(self.media.ffmpeg_version, r"ffmpeg version")
+        self.assertEqual(self.media.supports_fps_mode, self.media.ffmpeg_release >= (5, 1, 0))
+        self.assertEqual(self.media.cfr_arguments(), ["-fps_mode", "cfr"] if self.media.supports_fps_mode
+                         else ["-vsync", "1"])
+        with patch.object(self.media, "ffmpeg_release", (4, 4, 0)):
+            self.media.supports_fps_mode = False
+            self.assertEqual(self.media.cfr_arguments(), ["-vsync", "1"])
+        with patch.object(self.media, "ffmpeg_release", (6, 1, 0)):
+            self.media.supports_fps_mode = True
+            self.assertEqual(self.media.cfr_arguments(), ["-fps_mode", "cfr"])
+
+    def test_legacy_frame_sync_option_produces_verified_output(self):
+        output = self.root / 'legacy-sync.mp4'
+        with patch.object(self.media, 'supports_fps_mode', False), \
+                patch.object(self.media, 'nvenc_works', return_value=False):
+            info = self.media.save_video(self.frames, output, fps=8)
+        self.assertEqual(info['frames'], len(self.frames))
+        self.assertAlmostEqual(info['fps'], 8)
+
     def test_software_encoding_preserves_all_audio_tracks_and_frames(self):
         output = self.root / 'enhanced.mp4'
         with patch.object(self.media, 'nvenc_works', return_value=False):

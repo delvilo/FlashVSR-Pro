@@ -55,7 +55,9 @@ class InferenceEngine:
                 from utils.runtime import validate_cuda
                 index = validate_cuda(torch, config.device, config.dtype)
                 report.data.update(device=torch.cuda.get_device_name(index), torch=torch.__version__,
-                                   cuda=torch.version.cuda, ffmpeg=self.media.ffmpeg, ffprobe=self.media.ffprobe)
+                                   cuda=torch.version.cuda, ffmpeg=self.media.ffmpeg,
+                                   ffmpeg_version=str(getattr(self.media, "ffmpeg_version", "unknown")),
+                                   ffprobe=self.media.ffprobe)
             try:
                 self._execute(source, destination, info, report, torch)
             finally:

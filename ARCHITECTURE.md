@@ -23,7 +23,7 @@ flowchart TD
 | `flashvsr/engine.py` | Preflight, model lifecycle, inference, output and metrics |
 | `flashvsr/workflows.py` | Recursive batches and keyframe-aligned segments using the same engine |
 | `flashvsr/frames.py` | Decode all frames, natural image order, bicubic resize, spatial/temporal padding |
-| `flashvsr/media.py` | FFmpeg/FFprobe, NVENC probe and retry, all audio tracks, atomic verified output |
+| `flashvsr/media.py` | FFmpeg/FFprobe version detection, NVENC probe and retry, all audio tracks, atomic verified output |
 | `flashvsr/models.py`, `assets/models.json` | Model versions, cache, pinned downloads and SHA-256 verification |
 | `flashvsr/model_loading.py` | Strict DiT/projector/decoder loading and fixed prompt initialization |
 | `flashvsr/observability.py` | Logging configuration, run identifiers and report schema |
@@ -121,7 +121,10 @@ Batch reports contain per-input results and failure counts. Long-video reports
 contain per-segment results and the merged output metadata; original audio is
 attached once after video concatenation. Concatenation places each next segment
 using its predecessor's frame count and FPS, avoiding gaps from container
-timestamp offsets, and verifies the merged FPS. Temporary segments are deleted in a
+timestamp offsets, and verifies the merged FPS. Output encoding uses `-fps_mode
+cfr` on FFmpeg 5.1+ and the equivalent legacy `-vsync 1` on older releases.
+Reports record the detected FFmpeg version. Frame count, FPS, dimensions, and
+audio checks stay strict across versions. Temporary segments are deleted in a
 `finally` block unless `--keep-temp` is set. Final media replaces an existing
 file only after verification. Failure reports may replace older reports to
 describe the latest attempt; media and JSON publication are separate operations.

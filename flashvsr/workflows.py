@@ -76,7 +76,7 @@ def run_long(config, source, output_dir, segment_time=60.0, keep_temp=False, met
     started = time.perf_counter()
     report = {"schema_version": 1, "workflow": "long", "input": str(source), "output": str(destination),
               "parameters": config.as_dict(), "segment_seconds": segment_time, "runs": [],
-              "models": engine.registry.identity(config.mode)}
+              "models": engine.registry.identity(config.mode), "ffmpeg_version": media.ffmpeg_version}
     try:
         splits, processed = work / "splits", work / "processed"
         splits.mkdir()

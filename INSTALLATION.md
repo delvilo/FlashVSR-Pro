@@ -281,7 +281,7 @@ ffmpeg -hide_banner -f lavfi -i color=size=128x128:rate=1 \
   -frames:v 1 -c:v h264_nvenc -f null -
 ```
 
-Inference performs a real NVENC encode with the selected FFmpeg and retries failed hardware encodes with `libx264`. WebM uses `libvpx-vp9`; odd dimensions use software encoding. The shared media code verifies the result before replacing an existing output. All audio tracks are preserved when requested (AAC, or Opus for WebM); subtitles and attachments are not copied. Set `FLASHVSR_FFMPEG` and `FLASHVSR_FFPROBE` to explicit executable paths to override `PATH`. Imageio decoding is configured to use that same selected FFmpeg, so `IMAGEIO_FFMPEG_EXE` is not a separate encoder choice.
+The application detects the selected FFmpeg version and uses `-fps_mode cfr` on version 5.1 and later, or legacy `-vsync 1` on older releases. Both paths require the same verified frame count, FPS, dimensions, and requested audio tracks before replacing an existing output. Inference performs a real NVENC encode with the selected FFmpeg and retries failed hardware encodes with `libx264`. WebM uses `libvpx-vp9`; odd dimensions use software encoding. All audio tracks are preserved when requested (AAC, or Opus for WebM); subtitles and attachments are not copied. Set `FLASHVSR_FFMPEG` and `FLASHVSR_FFPROBE` to explicit executable paths to override `PATH`. Imageio decoding is configured to use that same selected FFmpeg, so `IMAGEIO_FFMPEG_EXE` is not a separate encoder choice.
 
 ### CUDA memory exhaustion
 
