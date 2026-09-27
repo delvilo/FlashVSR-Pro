@@ -123,8 +123,14 @@ attached once after video concatenation. Concatenation places each next segment
 using its predecessor's frame count and FPS, avoiding gaps from container
 timestamp offsets, and verifies the merged FPS. Output encoding uses `-fps_mode
 cfr` on FFmpeg 5.1+ and the equivalent legacy `-vsync 1` on older releases.
-Reports record the detected FFmpeg version. Frame count, FPS, dimensions, and
-audio checks stay strict across versions. Temporary segments are deleted in a
+Reports record the detected FFmpeg version. MP4/MOV/MKV use HEVC NVENC with
+`p7`, HQ tuning, VBR/CQ 20 at default quality, full-resolution multipass,
+three B-frames, middle B references, 32-frame lookahead, spatial/temporal AQ
+and `yuv420p`. A 40-frame test encode with these exact settings runs before
+hardware encoding; a failure or unexpected output codec triggers libx264.
+AVI retains H.264 NVENC. Frame count, FPS, dimensions, codec, and audio checks
+stay strict across versions. Concatenated segments must also share a codec.
+Temporary segments are deleted in a
 `finally` block unless `--keep-temp` is set. Final media replaces an existing
 file only after verification. Failure reports may replace older reports to
 describe the latest attempt; media and JSON publication are separate operations.

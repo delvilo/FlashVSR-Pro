@@ -10,7 +10,7 @@ FlashVSR-Pro supports direct Python execution on **native Linux and Google Colab
 - **Audio preservation:** `--keep-audio` transfers all input audio tracks to the processed video.
 - **Lower VRAM use:** `--tile-dit` splits inference into overlapping tiles; `--tile-vae` enables tiled decoding in full mode.
 - **Video alignment:** spatial and temporal padding accommodate model constraints, then output is cropped to the requested resolution and adjusted to the input frame count.
-- **GPU acceleration:** CUDA inference, TF32/cuDNN optimizations, and NVENC encoding when available, with software encoding support.
+- **GPU acceleration:** CUDA inference, TF32/cuDNN optimizations, and high-quality HEVC NVENC encoding for MP4/MOV/MKV when available, with software encoding fallback.
 - **Native installation:** `scripts/install.sh` installs the pinned Python dependencies and builds the bundled Block-Sparse-Attention backend.
 - **Model management:** pinned versions, mode-specific downloads, SHA-256 verification and a shared cache.
 - **Diagnostics:** leveled logs, optional JSONL logs, and automatic JSON reports with timings, FPS, peak VRAM, model identity and parameters.
@@ -219,13 +219,13 @@ Use the shallow clone command above for a smaller initial download. Older commit
 - **Out of memory:** enable `--tile-dit`, reduce tile size (minimum 128), use `tiny`, or shorten segments. Use `--tile-vae` with full mode.
 - **Missing model files:** run `python -m flashvsr models download --mode all`; use the same `--model-dir` or `FLASHVSR_MODEL_PATH` as inference.
 - **Missing audio:** pass `--keep-audio`, check that the input has audio, and ensure both `ffmpeg` and `ffprobe` are installed.
-- **NVENC issues:** the selected FFmpeg must complete a real test encode before NVENC is used. If hardware encoding fails, output is retried with libx264. See [INSTALLATION.md](INSTALLATION.md#video-tools).
+- **NVENC issues:** the selected FFmpeg must complete a real HEVC test encode with the requested preset before hardware encoding is used. If hardware encoding or output validation fails, output is retried with libx264. See [INSTALLATION.md](INSTALLATION.md#video-tools).
 
 ## Reliability checks
 
 The three command-line programs use exit codes **0** (success), **1** (runtime, input, model, or encoding failure), **2** (invalid arguments), and **130** (interrupted). `--help` works before installing the inference dependencies. Model loaders reject missing, empty, Git LFS pointer, corrupt, and incompatible weights instead of proceeding with uninitialized parameters.
 
-One FFmpeg implementation handles encoding, audio muxing, and concatenation. Outputs are verified for dimensions, frame count, and audio tracks before an atomic replacement; failed encodes preserve an existing output. `--keep-audio` preserves every audio track, re-encoding audio to AAC (Opus for WebM). Inputs without audio produce a silent output. Subtitles and attachments are not copied. GIF output cannot preserve audio.
+One FFmpeg implementation handles encoding, audio muxing, and concatenation. With a compatible GPU, even-sized MP4/MOV/MKV outputs use HEVC NVENC preset `p7`, HQ tuning, full-resolution multipass VBR, three B-frames with middle references, 32-frame lookahead, spatial/temporal AQ, and `yuv420p`. Default `--quality 10` maps to `-cq 20`; lower quality settings raise CQ. AVI keeps H.264 NVENC, WebM uses VP9, and GIF uses GIF; missing or failed NVENC and odd dimensions use libx264 for compatible containers. Outputs are verified for codec, dimensions, frame count, FPS, and audio tracks before an atomic replacement; failed encodes preserve an existing output. `--keep-audio` preserves every audio track, re-encoding audio to AAC (Opus for WebM). Inputs without audio produce a silent output. Subtitles and attachments are not copied. GIF output cannot preserve audio.
 
 See [TESTING.md](TESTING.md) for CPU CI, source-package checks, and real GPU acceptance. CPU tests do not certify CUDA kernel or model execution.
 

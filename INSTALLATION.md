@@ -274,14 +274,16 @@ ffmpeg -version
 ffprobe -version
 ```
 
-To check whether the system encoder can actually use NVENC:
+To check whether the system encoder can use the requested HEVC NVENC settings:
 
 ```bash
-ffmpeg -hide_banner -f lavfi -i color=size=128x128:rate=1 \
-  -frames:v 1 -c:v h264_nvenc -f null -
+ffmpeg -hide_banner -f lavfi -i color=size=128x128:rate=30:duration=2 \
+  -map 0:v:0 -c:v hevc_nvenc -preset p7 -tune hq -rc vbr -cq 20 -b:v 0 \
+  -multipass fullres -bf 3 -b_ref_mode middle -rc-lookahead 32 \
+  -spatial-aq 1 -temporal-aq 1 -pix_fmt yuv420p -frames:v 40 -f null -
 ```
 
-The application detects the selected FFmpeg version and uses `-fps_mode cfr` on version 5.1 and later, or legacy `-vsync 1` on older releases. Both paths require the same verified frame count, FPS, dimensions, and requested audio tracks before replacing an existing output. Inference performs a real NVENC encode with the selected FFmpeg and retries failed hardware encodes with `libx264`. WebM uses `libvpx-vp9`; odd dimensions use software encoding. All audio tracks are preserved when requested (AAC, or Opus for WebM); subtitles and attachments are not copied. Set `FLASHVSR_FFMPEG` and `FLASHVSR_FFPROBE` to explicit executable paths to override `PATH`. Imageio decoding is configured to use that same selected FFmpeg, so `IMAGEIO_FFMPEG_EXE` is not a separate encoder choice.
+The application detects the selected FFmpeg version and uses `-fps_mode cfr` on version 5.1 and later, or legacy `-vsync 1` on older releases. For MP4/MOV/MKV it tests a full 40-frame HEVC NVENC encode with all selected settings before processing the video. Default quality 10 uses `-cq 20`; the other quality settings map to CQ 20–26. If the selected FFmpeg, driver, or GPU cannot use the settings, or if actual encoding or output verification fails, the output uses `libx264` instead. AVI retains H.264 NVENC; WebM uses `libvpx-vp9`; GIF uses GIF, and odd dimensions use software encoding. Every output must pass codec, frame count, FPS, dimension, and requested audio-track checks before replacing an existing file. All audio tracks are preserved when requested (AAC, or Opus for WebM); subtitles and attachments are not copied. Set `FLASHVSR_FFMPEG` and `FLASHVSR_FFPROBE` to explicit executable paths to override `PATH`. Imageio decoding is configured to use that same selected FFmpeg, so `IMAGEIO_FFMPEG_EXE` is not a separate encoder choice.
 
 ### CUDA memory exhaustion
 

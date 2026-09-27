@@ -112,7 +112,8 @@ class MediaTools:
     def has_audio(self, path):
         return any(stream.get("codec_type") == "audio" for stream in self.probe(path).get("streams", []))
 
-    def verify_video(self, path, *, width=None, height=None, frames=None, audio=None, audio_streams=None, fps=None):
+    def verify_video(self, path, *, width=None, height=None, frames=None, audio=None,
+                     audio_streams=None, fps=None, video_codec=None):
         if not Path(path).is_file() or Path(path).stat().st_size == 0:
             raise MediaError(f"Output is missing or empty: {path}")
         data = self.probe(path, count_frames=True)
@@ -125,6 +126,7 @@ class MediaTools:
                 "width": int(stream.get("width", 0)),
                 "height": int(stream.get("height", 0)),
                 "frames": int(stream.get("nb_read_frames", 0) or 0),
+                "video_codec": stream.get("codec_name"),
                 "fps": _rate(stream.get("avg_frame_rate")) or _rate(stream.get("r_frame_rate")),
                 "has_audio": any(s.get("codec_type") == "audio" for s in data.get("streams", [])),
                 "audio_streams": sum(s.get("codec_type") == "audio" for s in data.get("streams", [])),
@@ -136,21 +138,47 @@ class MediaTools:
             raise MediaError(f"Invalid video timing metadata: {path}")
         if min(actual["width"], actual["height"], actual["frames"]) <= 0:
             raise MediaError(f"Invalid video dimensions or frame count: {path}")
-        for key, expected in (("width", width), ("height", height), ("frames", frames), ("has_audio", audio), ("audio_streams", audio_streams)):
+        for key, expected in (("width", width), ("height", height), ("frames", frames),
+                              ("has_audio", audio), ("audio_streams", audio_streams),
+                              ("video_codec", video_codec)):
             if expected is not None and actual[key] != expected:
                 raise MediaError(f"Output {key}: expected {expected}, got {actual[key]} ({path})")
         if fps is not None and not math.isclose(actual["fps"], fps, rel_tol=0.005, abs_tol=0.01):
             raise MediaError(f"Output FPS: expected {fps}, got {actual['fps']} ({path})")
         return actual
 
+    @staticmethod
+    def _hevc_nvenc_arguments(quality, device_index):
+        # The default quality 10 maps to CQ 20; lower quality selects a larger CQ.
+        cq = str(int(26 - quality * 0.6))
+        return ["-gpu", str(device_index), "-preset", "p7", "-tune", "hq",
+                "-rc", "vbr", "-cq", cq, "-b:v", "0", "-multipass", "fullres",
+                "-bf", "3", "-b_ref_mode", "middle", "-rc-lookahead", "32",
+                "-spatial-aq", "1", "-temporal-aq", "1"]
+
     @lru_cache(maxsize=16)
-    def nvenc_works(self, device_index=0):
-        # Listing an encoder does not prove that its driver and hardware work.
+    def nvenc_works(self, device_index=0, quality=10):
+        # Exercise the full preset, including more frames than the lookahead window.
         try:
             self.run([
-                "-f", "lavfi", "-i", "color=size=128x128:rate=1", "-frames:v", "1",
-                "-c:v", "h264_nvenc", "-gpu", str(device_index), "-f", "null", "-",
-            ], timeout=15)
+                "-f", "lavfi", "-i", "color=size=128x128:rate=30:duration=2",
+                "-map", "0:v:0", "-c:v", "hevc_nvenc",
+                *self._hevc_nvenc_arguments(quality, device_index),
+                "-pix_fmt", "yuv420p", *self.cfr_arguments(),
+                "-frames:v", "40", "-f", "null", "-",
+            ], timeout=30)
+            return True
+        except MediaError as error:
+            logger.debug("HEVC NVENC test encode unavailable: %s", error)
+            return False
+
+    @lru_cache(maxsize=16)
+    def _h264_nvenc_works(self, device_index=0):
+        # AVI retains its existing H.264 path; HEVC is used for MP4/MOV/MKV.
+        try:
+            self.run(["-f", "lavfi", "-i", "color=size=128x128:rate=1",
+                      "-frames:v", "1", "-c:v", "h264_nvenc", "-gpu", str(device_index),
+                      "-f", "null", "-"], timeout=15)
             return True
         except MediaError:
             return False
@@ -171,7 +199,9 @@ class MediaTools:
         if audio_source is not None:
             arguments += ["-i", str(audio_source)]
         arguments += ["-map", "0:v:0", "-c:v", codec]
-        if codec == "h264_nvenc":
+        if codec == "hevc_nvenc":
+            arguments += self._hevc_nvenc_arguments(quality, device_index)
+        elif codec == "h264_nvenc":
             arguments += ["-gpu", str(device_index), "-preset", "p1", "-rc", "vbr", "-cq", quality_value, "-b:v", "0"]
         elif codec == "libx264":
             arguments += ["-preset", "veryfast", "-crf", quality_value]
@@ -257,8 +287,13 @@ class MediaTools:
             codecs = ["libvpx-vp9"]
         else:
             codecs = ["libx264"]
-            if width % 2 == height % 2 == 0 and self.nvenc_works(device_index):
-                codecs.insert(0, "h264_nvenc")
+            if width % 2 == height % 2 == 0:
+                if suffix in {".mp4", ".mov", ".mkv"} and self.nvenc_works(device_index, quality):
+                    codecs.insert(0, "hevc_nvenc")
+                elif suffix == ".avi" and self._h264_nvenc_works(device_index):
+                    codecs.insert(0, "h264_nvenc")
+        output_codecs = {"hevc_nvenc": "hevc", "h264_nvenc": "h264",
+                         "libx264": "h264", "libvpx-vp9": "vp9", "gif": "gif"}
         for codec in codecs:
             try:
                 with atomic_output(destination) as temporary:
@@ -266,11 +301,12 @@ class MediaTools:
                     info = self.verify_video(
                         temporary, width=width, height=height, frames=len(frames),
                         audio_streams=audio_count, fps=fps if suffix != ".gif" else None,
+                        video_codec=output_codecs[codec],
                     )
                 logger.info(f"Saved and verified with {codec}: {destination}")
                 return info
             except (MediaError, OSError, subprocess.SubprocessError) as error:
-                if codec != "h264_nvenc":
+                if codec not in {"hevc_nvenc", "h264_nvenc"}:
                     raise MediaError(f"Cannot save {destination}: {error}") from error
                 logger.warning("NVENC failed; retrying with libx264: %s", error)
         raise MediaError(f"No encoder succeeded: {destination}")
@@ -292,7 +328,7 @@ class MediaTools:
                 self.run(["-i", video, "-map", "0:v:0", "-c:v", "copy", "-an", temporary])
             return self.verify_video(
                 temporary, width=info["width"], height=info["height"], frames=info["frames"], audio_streams=audio_count,
-                fps=info["fps"],
+                fps=info["fps"], video_codec=info["video_codec"],
             )
 
     def concat_videos(self, paths, destination):
@@ -301,8 +337,8 @@ class MediaTools:
         metadata = [self.verify_video(path) for path in paths]
         reference = metadata[0]
         for info in metadata[1:]:
-            if any(info[key] != reference[key] for key in ("width", "height", "audio_streams")):
-                raise MediaError("Segment dimensions or audio streams do not match")
+            if any(info[key] != reference[key] for key in ("width", "height", "audio_streams", "video_codec")):
+                raise MediaError("Segment dimensions, codecs or audio streams do not match")
             if not math.isclose(info["fps"], reference["fps"], rel_tol=0.001):
                 raise MediaError("Segment frame rates do not match")
         with tempfile.TemporaryDirectory(prefix="flashvsr-concat-") as folder:
@@ -322,5 +358,5 @@ class MediaTools:
                 return self.verify_video(
                     temporary, width=reference["width"], height=reference["height"],
                     frames=sum(item["frames"] for item in metadata), audio_streams=reference["audio_streams"],
-                    fps=reference["fps"],
+                    fps=reference["fps"], video_codec=reference["video_codec"],
                 )

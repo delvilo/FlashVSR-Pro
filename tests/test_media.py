@@ -67,15 +67,46 @@ class MediaTests(unittest.TestCase):
         codecs = []
         def encode(frames, output, fps, codec, *args):
             codecs.append(codec)
-            if codec == 'h264_nvenc':
+            if codec == 'hevc_nvenc':
                 Path(output).write_bytes(b'partial hardware output')
                 raise MediaError('driver unavailable')
             return original(frames, output, fps, codec, *args)
         with patch.object(self.media, 'nvenc_works', return_value=True), patch.object(self.media, '_pipe_frames', side_effect=encode):
             with self.assertLogs('flashvsr.media', level='WARNING'):
                 self.media.save_video(self.frames, self.root / 'fallback.mp4', fps=8)
-        self.assertEqual(codecs, ['h264_nvenc', 'libx264'])
-        self.media.verify_video(self.root / 'fallback.mp4', frames=8)
+        self.assertEqual(codecs, ['hevc_nvenc', 'libx264'])
+        self.media.verify_video(self.root / 'fallback.mp4', frames=8, video_codec='h264')
+
+    def test_hevc_preset_probe_and_codec_verification(self):
+        settings = self.media._hevc_nvenc_arguments(10, 2)
+        self.assertEqual(settings, ['-gpu', '2', '-preset', 'p7', '-tune', 'hq', '-rc', 'vbr',
+                                    '-cq', '20', '-b:v', '0', '-multipass', 'fullres', '-bf', '3',
+                                    '-b_ref_mode', 'middle', '-rc-lookahead', '32',
+                                    '-spatial-aq', '1', '-temporal-aq', '1'])
+        self.assertEqual(self.media._hevc_nvenc_arguments(0, 2)[9], '26')
+        with patch.object(self.media, 'run', side_effect=MediaError('no compatible GPU')) as run:
+            self.assertFalse(self.media.nvenc_works(2, 10))
+        arguments = run.call_args.args[0]
+        self.assertIn('hevc_nvenc', arguments)
+        self.assertIn('40', arguments)
+        self.assertEqual(arguments[arguments.index('-gpu') + 1], '2')
+        self.assertEqual(run.call_args.kwargs['timeout'], 30)
+        with self.assertRaisesRegex(MediaError, 'video_codec'):
+            self.media.verify_video(self.source, video_codec='hevc')
+
+    def test_hevc_probe_succeeds_but_wrong_codec_retries_software(self):
+        original = self.media._pipe_frames
+        codecs = []
+        def encode(frames, output, fps, codec, *args):
+            codecs.append(codec)
+            # Simulate an encoder that exits successfully but writes H.264.
+            return original(frames, output, fps, 'libx264', *args)
+        with patch.object(self.media, 'nvenc_works', return_value=True), \
+                patch.object(self.media, '_pipe_frames', side_effect=encode):
+            with self.assertLogs('flashvsr.media', level='WARNING'):
+                info = self.media.save_video(self.frames, self.root / 'checked.mp4', fps=8)
+        self.assertEqual(codecs, ['hevc_nvenc', 'libx264'])
+        self.assertEqual(info['video_codec'], 'h264')
 
     def test_failed_encode_or_verification_preserves_previous_output(self):
         output = self.root / 'existing.mp4'
