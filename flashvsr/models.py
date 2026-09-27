@@ -49,38 +49,33 @@ class ModelRegistry:
         self.release = manifest["versions"][version]
         self.directory = model_directory(version, directory)
         self.entries = tuple(ModelFile(**item) for item in self.release["files"])
-        self._verified = {}
 
     def selected(self, mode="all"):
         if mode not in ("all", "full", "tiny", "tiny-long"):
             raise ValueError(f"Unsupported inference mode: {mode}")
         return tuple(item for item in self.entries if mode == "all" or mode in item.modes)
 
-    def verify(self, item, path=None, *, force=False):
+    def verify(self, item, path=None):
         path = Path(path) if path is not None else self.directory / item.name
         if not path.is_file():
             raise FileNotFoundError(f"Model weight missing: {path}. Run: flashvsr models download --mode all")
         stat = path.stat()
-        signature = (str(path), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino, item.sha256)
-        if not force and self._verified.get(item.name) == signature:
-            return path
         if stat.st_size != item.bytes:
             raise ValueError(f"Model size mismatch: {path}: expected {item.bytes}, got {stat.st_size}; run models download to repair")
         if sha256_file(path) != item.sha256:
             raise ValueError(f"Model SHA-256 mismatch: {path}; run models download to repair")
-        self._verified[item.name] = signature
         logger.debug("Verified model %s sha256=%s", path, item.sha256)
         return path
 
-    def check(self, mode="all", *, force=False):
-        return {item.name: self.verify(item, force=force) for item in self.selected(mode)}
+    def check(self, mode="all"):
+        return {item.name: self.verify(item) for item in self.selected(mode)}
 
     def report(self, mode="all"):
         """Report every missing/corrupt file, rather than stopping at the first."""
         results = []
         for item in self.selected(mode):
             try:
-                self.verify(item, force=True)
+                self.verify(item)
                 results.append({"name": item.name, "status": "ok"})
             except (OSError, ValueError) as error:
                 results.append({"name": item.name, "status": "error", "error": str(error)})
@@ -123,7 +118,7 @@ class ModelRegistry:
                                     target.write(block)
                         target.flush()
                         os.fsync(target.fileno())
-                    self.verify(item, temporary, force=True)
+                    self.verify(item, temporary)
                     os.replace(temporary, destination)
                     logger.info("Downloaded and verified: %s", destination)
                 finally:

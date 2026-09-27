@@ -95,6 +95,17 @@ class MediaTests(unittest.TestCase):
         output = self.root / 'merged.mp4'
         info = self.media.concat_videos([self.source, quoted], output)
         self.assertEqual((info['frames'], info['audio_streams']), (16, 2))
+        self.assertAlmostEqual(info['fps'], 8)
+
+    def test_concat_uses_video_duration_despite_initial_timestamp_offset(self):
+        segment = self.root / 'offset.mkv'
+        self.media.run(['-f', 'lavfi', '-i', 'testsrc2=size=128x96:rate=8:duration=1',
+                        '-c:v', 'libx264', '-output_ts_offset', '0.25', segment])
+        info = self.media.verify_video(segment)
+        self.assertGreater(info['duration'], info['frames'] / info['fps'])
+        output = self.root / 'joined-offset.mp4'
+        self.media.concat_videos([segment, segment], output)
+        self.media.verify_video(output, width=128, height=96, frames=16, fps=8, audio_streams=0)
 
     def test_odd_resolution_uses_software_encoder(self):
         frames = [frame[:95, :127] for frame in self.frames]

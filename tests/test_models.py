@@ -54,6 +54,17 @@ class ModelRegistryTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b"old file")
             self.assertEqual(list(self.root.glob("*.part")), [])
 
+    def test_same_stat_metadata_does_not_hide_changed_contents(self):
+        path = self.root / self.file.name
+        path.write_bytes(self.data)
+        original_stat = path.stat()
+        self.registry.check("tiny")
+        path.write_bytes(b"x" * len(self.data))
+        # Reproduce coarse filesystem timestamps without depending on timing.
+        with patch.object(Path, "stat", return_value=original_stat):
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                self.registry.check("tiny")
+
     def test_interrupted_download_cleans_temporary_file(self):
         source = io.BytesIO(self.data)
         with patch("urllib.request.urlopen", return_value=source), patch.object(source, "read", side_effect=KeyboardInterrupt):

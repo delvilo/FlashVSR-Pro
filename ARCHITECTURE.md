@@ -37,7 +37,7 @@ PyTorch. Actual inference still requires the compiled sparse attention backend.
 
 Each input/segment gets a fresh pipeline and its own decoder/KV caches. This
 preserves isolation between clips and releases resources on failure. A batch
-reuses the engine, FFmpeg selection and in-process verification cache, but loads
+reuses the engine, FFmpeg selection and model registry, but verifies and loads
 model parameters for each clip; GPU model pooling is not implemented.
 
 ## Retained DiffSynth dependencies
@@ -91,9 +91,11 @@ Downloads take a directory lock, stream to a unique `.part` file, verify size
 and digest, then atomically replace the target. An interrupted or corrupt
 download removes its partial file and leaves the existing target intact. A
 retry starts the file again; partial byte-range resumption is not implemented.
-Unchanged verified files are reused. `models check` hashes every selected file;
-inference hashes on first use and rechecks files whose stat identity changes
-within the same process. Checks are local and never trigger implicit downloads.
+Valid local files are reused without downloading. `models check` and every
+inference input hash all selected files, including batch items and long-video
+segments. This reads several GB per input; verification is not cached by file
+timestamps because a same-size rewrite can share the same timestamp on some
+filesystems. Checks are local and never trigger implicit downloads.
 
 Changing a model release requires adding a manifest version with independently
 verified digests and compatible architecture, updating loaders when necessary,
@@ -117,7 +119,9 @@ intentionally print machine-readable JSON to stdout.
 
 Batch reports contain per-input results and failure counts. Long-video reports
 contain per-segment results and the merged output metadata; original audio is
-attached once after video concatenation. Temporary segments are deleted in a
+attached once after video concatenation. Concatenation places each next segment
+using its predecessor's frame count and FPS, avoiding gaps from container
+timestamp offsets, and verifies the merged FPS. Temporary segments are deleted in a
 `finally` block unless `--keep-temp` is set. Final media replaces an existing
 file only after verification. Failure reports may replace older reports to
 describe the latest attempt; media and JSON publication are separate operations.

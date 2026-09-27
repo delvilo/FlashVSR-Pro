@@ -280,15 +280,19 @@ class MediaTools:
         with tempfile.TemporaryDirectory(prefix="flashvsr-concat-") as folder:
             listing = Path(folder) / "segments.txt"
             lines = []
-            for path in paths:
+            for path, info in zip(paths, metadata):
                 name = str(Path(path).resolve())
                 if "\n" in name or "\r" in name:
                     raise MediaError("Segment paths cannot contain newlines")
                 lines.append("file '" + name.replace("'", "'\\''") + "'\n")
+                # Container duration can include an initial timestamp offset or
+                # audio padding. Place the next video after the decoded frames.
+                lines.append(f"duration {info['frames'] / info['fps']:.9f}\n")
             listing.write_text("".join(lines), encoding="utf-8")
             with atomic_output(destination) as temporary:
                 self.run(["-f", "concat", "-safe", "0", "-i", listing, "-map", "0:v:0", "-map", "0:a?", "-c", "copy", temporary])
                 return self.verify_video(
                     temporary, width=reference["width"], height=reference["height"],
                     frames=sum(item["frames"] for item in metadata), audio_streams=reference["audio_streams"],
+                    fps=reference["fps"],
                 )
