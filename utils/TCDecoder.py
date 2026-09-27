@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 #!/usr/bin/env python3
 """
 Tiny AutoEncoder for Hunyuan Video (Decoder-only, pruned)
@@ -9,7 +12,7 @@ Tiny AutoEncoder for Hunyuan Video (Decoder-only, pruned)
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tqdm.auto import tqdm
+from flashvsr.progress import tqdm
 from collections import namedtuple
 from einops import rearrange
 import torch.nn.init as init
@@ -217,7 +220,7 @@ class TAEHV(nn.Module):
                 self.patch_tgrow_layers(torch.load(checkpoint_path, map_location="cpu", weights_only=True)),
                 strict=False
             )
-            print('missing_keys', missing_keys)
+            logger.debug("%s", ('missing_keys', missing_keys))
 
         # Initialize decoder mem state
         self.mem = [None] * len(self.decoder)

@@ -11,7 +11,7 @@ from PIL import Image
 import torch
 from einops import rearrange
 
-import infer
+from flashvsr import frames as infer
 
 
 class InputFrameTests(unittest.TestCase):
@@ -19,10 +19,6 @@ class InputFrameTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.runtime = patch.multiple(infer, torch=torch, np=np, Image=Image, imageio=imageio,
-                                      rearrange=rearrange, create=True)
-        self.runtime.start()
-        self.addCleanup(self.runtime.stop)
 
     def test_image_sequence_keeps_original_dimensions_and_count(self):
         for index in range(2):

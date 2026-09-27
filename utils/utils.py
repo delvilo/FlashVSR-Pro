@@ -42,12 +42,9 @@ class CausalConv3d(nn.Conv3d):
         padding = list(self._padding)
         if cache_x is not None and self._padding[4] > 0:
             cache_x = cache_x.to(x.device)
-            # print(cache_x.shape, x.shape)
             x = torch.cat([cache_x, x], dim=2)
             padding[4] -= cache_x.shape[2]
-            # print('cache!')
         x = F.pad(x, padding, mode='replicate') # mode='replicate'
-        # print(x[0,0,:,0,0])
 
         return super().forward(x)
     
@@ -97,7 +94,6 @@ class Buffer_LQ4x_Proj(nn.Module):
         iter_ = 1 + (t - 1) // 4
         first_frame = video[:, :, :1, :, :].repeat(1, 1, 3, 1, 1)
         video = torch.cat([first_frame, video], dim=2)
-        # print(video.shape)
 
         out_x = []
         for i in range(iter_):
@@ -116,7 +112,6 @@ class Buffer_LQ4x_Proj(nn.Module):
             x = self.act2(x)
             out_x.append(x)
         out_x = torch.cat(out_x, dim = 2)
-        # print(out_x.shape)
         out_x = rearrange(out_x, 'b c f h w -> b (f h w) c')
         outputs = []
         for i in range(self.layer_num):
@@ -196,7 +191,6 @@ class Causal_LQ4x_Proj(nn.Module):
         iter_ = 1 + (t - 1) // 4
         first_frame = video[:, :, :1, :, :].repeat(1, 1, 3, 1, 1)
         video = torch.cat([first_frame, video], dim=2)
-        # print(video.shape)
 
         out_x = []
         for i in range(iter_):

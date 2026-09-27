@@ -52,7 +52,7 @@ class MediaTests(unittest.TestCase):
                 raise MediaError('driver unavailable')
             return original(frames, output, fps, codec, *args)
         with patch.object(self.media, 'nvenc_works', return_value=True), patch.object(self.media, '_pipe_frames', side_effect=encode):
-            with self.assertWarnsRegex(UserWarning, 'retrying with libx264'):
+            with self.assertLogs('flashvsr.media', level='WARNING'):
                 self.media.save_video(self.frames, self.root / 'fallback.mp4', fps=8)
         self.assertEqual(codecs, ['h264_nvenc', 'libx264'])
         self.media.verify_video(self.root / 'fallback.mp4', frames=8)

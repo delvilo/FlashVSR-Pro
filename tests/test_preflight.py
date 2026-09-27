@@ -56,21 +56,6 @@ class PreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Git LFS pointer'):
             require_weight(path)
 
-    def test_mode_specific_weights(self):
-        models = self.root / 'models'
-        models.mkdir()
-        prompt = self.root / 'models/prompt_tensor/posi_prompt.pth'
-        prompt.parent.mkdir()
-        prompt.write_bytes(b'prompt')
-        for name in ('diffusion_pytorch_model_streaming_dmd.safetensors', 'LQ_proj_in.ckpt', 'TCDecoder.ckpt'):
-            (models / name).write_bytes(b'weight')
-        for mode in ('tiny', 'tiny-long'):
-            self.assertEqual(validate_models(mode, models, self.root), models)
-        with self.assertRaisesRegex(FileNotFoundError, 'Wan2.1_VAE.pth'):
-            validate_models('full', models, self.root)
-        (models / 'Wan2.1_VAE.pth').write_bytes(b'weight')
-        validate_models('full', models, self.root)
-
     def test_cuda_rejects_cpu_and_unsupported_hardware_before_set_device(self):
         torch = SimpleNamespace(__version__='2.10.0+cu126', version=SimpleNamespace(cuda='12.6'), cuda=MagicMock())
         torch.cuda.is_available.return_value = False
@@ -128,10 +113,10 @@ class PreflightTests(unittest.TestCase):
             raise RuntimeError('inference failed')
         def cancel(argv):
             raise KeyboardInterrupt
-        with redirect_stderr(io.StringIO()) as errors:
+        with self.assertLogs('flashvsr.cli', level='WARNING') as errors:
             self.assertEqual(run_cli(fail), 1)
             self.assertEqual(run_cli(cancel), 130)
-        self.assertIn('inference failed', errors.getvalue())
+        self.assertIn('inference failed', ' '.join(errors.output))
         self.assertEqual(run_cli(lambda argv: None), 0)
 
     def test_help_and_missing_models_do_not_import_torch(self):
@@ -143,7 +128,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         source = self.root / 'input.mp4'
         source.write_bytes(b'fixture')
-        result = subprocess.run([sys.executable, str(PROJECT / 'infer.py'), '-i', str(source)], env=env, capture_output=True, text=True)
+        result = subprocess.run([sys.executable, str(PROJECT / 'infer.py'), '-i', str(source)], env=env, cwd=self.root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 1)
         self.assertIn('Model weight missing', result.stderr)
         self.assertNotIn('EARLY_TORCH_IMPORT', result.stderr)

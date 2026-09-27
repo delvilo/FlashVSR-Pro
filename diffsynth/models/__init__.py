@@ -1,1 +1,1 @@
-from .model_manager import *
+"""Wan DiT and VAE internals used by FlashVSR."""

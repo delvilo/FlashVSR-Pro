@@ -6,7 +6,7 @@ This guide covers direct installation and execution on **native Linux and Google
 
 - Linux with an NVIDIA driver and an Ampere, Ada, or Hopper GPU.
 - Python 3.12–3.14. Python 3.12 is the Linux/Colab reference version.
-- CUDA Toolkit **12.5 or newer (12.x)**, including `nvcc`, with PyTorch **2.10.0+cu126**, torchvision **0.25.0+cu126**, and torchaudio **2.10.0+cu126**. Toolkit 12.6 matches the PyTorch wheels; compiling with 12.5 or another CUDA 12.x minor version may emit a PyTorch minor-version warning.
+- CUDA Toolkit **12.5 or newer (12.x)**, including `nvcc`, with PyTorch **2.10.0+cu126**. Toolkit 12.6 matches the PyTorch wheels; compiling with 12.5 or another CUDA 12.x minor version may emit a PyTorch minor-version warning.
 - A C++17 compiler, Git, FFmpeg, and FFprobe.
 - Enough disk space for model weights, build files, input videos, and results.
 - VRAM requirements vary with resolution and duration. Begin with a short clip and `--tile-dit`.
@@ -60,7 +60,7 @@ The sparse attention source and CUTLASS headers are included as regular files in
 bash scripts/install.sh
 ```
 
-The installer uses the active `python` interpreter, checks prerequisites, installs PyTorch 2.10.0/torchvision 0.25.0/torchaudio 2.10.0 from the CUDA 12.6 index, installs the application dependencies, and builds the bundled CUDA extension against that PyTorch installation. It removes conflicting OpenCV distributions and installs only `opencv-python-headless`. It creates `inputs/` and `results/`, checks dependency consistency and application imports, and records installed versions in `results/environment.json`. Use a dedicated environment because installation changes its packages.
+The installer uses the active `python` interpreter, checks prerequisites, installs PyTorch 2.10.0 from the CUDA 12.6 index, installs the application dependencies, and builds the bundled CUDA extension against that PyTorch installation. The minimal runtime does not require OpenCV, torchvision, torchaudio or Transformers. It creates `inputs/` and `results/`, checks dependency consistency and application imports, and records installed versions in `results/environment.json`. Use a dedicated environment because installation changes its packages.
 
 To select an explicit interpreter:
 
@@ -78,38 +78,56 @@ The defaults limit compiler memory usage and select Ampere/Hopper architectures 
 
 ### 4. Download weights
 
-From the project directory and the activated Python environment:
-
 ```bash
-python -c "from huggingface_hub import snapshot_download; snapshot_download('JunhaoZhuang/FlashVSR-v1.1', local_dir='models/FlashVSR-v1.1')"
+python -m flashvsr models list --mode all
+python -m flashvsr models download --mode all
+python -m flashvsr models check --mode all
 ```
 
-This downloads actual model data. Downloading a Git repository without its LFS objects would leave pointer files that cannot be loaded as weights.
+Use `--mode tiny` or `--mode tiny-long` to skip the full-mode VAE, or `--mode full`
+to skip TCDecoder. The default directory is `~/.cache/flashvsr/v1.1`.
+`XDG_CACHE_HOME` changes the base cache location; `FLASHVSR_CACHE_DIR` changes
+the FlashVSR cache root. `--model-dir` overrides `FLASHVSR_MODEL_PATH` and
+selects an exact model directory. Every workflow uses the same rules.
 
-| File | Used by |
+| File in the selected directory | Used by |
 | --- | --- |
-| `models/FlashVSR-v1.1/diffusion_pytorch_model_streaming_dmd.safetensors` | All modes |
-| `models/FlashVSR-v1.1/LQ_proj_in.ckpt` | All modes |
-| `models/FlashVSR-v1.1/TCDecoder.ckpt` | `tiny`, `tiny-long` |
-| `models/FlashVSR-v1.1/Wan2.1_VAE.pth` | `full` |
-| `models/prompt_tensor/posi_prompt.pth` | Bundled in the checkout; all modes |
+| `diffusion_pytorch_model_streaming_dmd.safetensors` | All modes |
+| `LQ_proj_in.ckpt` | All modes |
+| `TCDecoder.ckpt` | `tiny`, `tiny-long` |
+| `Wan2.1_VAE.pth` | `full` |
+| `posi_prompt.pth` | All modes; copied from the installed package |
 
-All required weights should be downloaded before inference. Decoder loading does not automatically fetch missing files.
+The versioned manifest pins an upstream commit, byte size and SHA-256 for each
+file. Downloads verify temporary files before atomic replacement. Re-running
+the command skips valid files and repairs corrupt ones. Interrupted downloads
+remove partial data; a retry restarts the affected file. Inference verifies
+models before importing PyTorch and never downloads them automatically.
 
-To use another location, download into that directory and set `FLASHVSR_MODEL_PATH`. Both DiT/projector and decoder loading use it. User-supplied relative paths resolve from the current directory; the default weights and bundled prompt resolve from the project location.
+Existing installations can reuse their weights without moving them:
+
+```bash
+export FLASHVSR_MODEL_PATH="$PWD/models/FlashVSR-v1.1"
+python -m flashvsr models download --mode all
+python -m flashvsr models check --mode all
+```
+
+This checks existing weights and adds the prompt to the same directory. The
+legacy `FLASHVSR-Pro_MODEL_PATH` environment key is still accepted. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for integrity and cache behavior.
 
 ### 5. Verify and run
 
 ```bash
 python -c "import torch; import block_sparse_attn; import diffsynth; print(torch.__version__, torch.version.cuda, torch.cuda.get_device_name())"
-python infer.py --help
+python -m flashvsr infer --help
 python scripts/download_samples.py example0.mp4
-python infer.py -i inputs/example0.mp4 -o results/ --mode tiny --scale 4.0 --tile-dit
+python -m flashvsr infer -i inputs/example0.mp4 -o results/ --mode tiny --scale 4.0 --tile-dit
 ```
 
 The sample downloader needs only Python's standard library. It fetches the selected video from a fixed repository commit and verifies its byte count and SHA-256 before saving it. Use your own video path to skip the sample download. See [inputs/README.md](inputs/README.md) for the optional collection.
 
-For subsequent sessions, activate the same environment. You may call the scripts using absolute paths from another directory; the bundled models and prompt do not depend on the shell's working directory.
+For subsequent sessions, activate the same environment. You may call the scripts using absolute paths from another directory; the default model cache does not depend on the shell's working directory.
 
 ## Google Colab
 
@@ -160,9 +178,7 @@ Download models and choose an input. The following cell uses an optional sample;
 
 ```python
 subprocess.run([
-    project_python, '-c',
-    "from huggingface_hub import snapshot_download; "
-    "snapshot_download('JunhaoZhuang/FlashVSR-v1.1', local_dir='models/FlashVSR-v1.1')"
+    project_python, '-m', 'flashvsr', 'models', 'download', '--mode', 'all'
 ], cwd=project, check=True)
 
 input_video = project / 'inputs/example0.mp4'  # Or Path('/content/input.mp4').
@@ -174,7 +190,7 @@ if input_video == project / 'inputs/example0.mp4':
 if not input_video.is_file():
     raise FileNotFoundError(input_video)
 subprocess.run([
-    project_python, str(project / 'infer.py'),
+    project_python, '-m', 'flashvsr', 'infer',
     '-i', str(input_video), '-o', str(output_video),
     '--mode', 'tiny', '--scale', '4.0', '--tile-dit', '--keep-audio'
 ], cwd=project, check=True)
@@ -196,7 +212,6 @@ The installer is preferred because it validates the selected environment. The eq
 ```bash
 python -m pip install -r requirements-build.txt
 python -m pip install -r requirements-cuda.txt
-python -m pip uninstall -y opencv-python opencv-contrib-python opencv-contrib-python-headless opencv-python-headless
 python -m pip install -r requirements.txt
 python -m pip install --no-build-isolation --no-deps -e .
 BLOCK_SPARSE_ATTN_CUDA_ARCHS='80;90' MAX_JOBS=2 NVCC_THREADS=2 \
@@ -214,17 +229,17 @@ Install PyTorch before the other requirements: `requirements-cuda.txt` selects t
 
 | File | Purpose |
 | --- | --- |
-| `requirements.txt` | Pinned direct application dependencies; one headless OpenCV build |
-| `requirements-cuda.txt` | PyTorch/torchvision/torchaudio cu126 wheels for inference |
+| `requirements.txt` | Eight pinned direct runtime dependencies |
+| `requirements-cuda.txt` | PyTorch cu126 wheel for inference |
 | `requirements-build.txt` | Pinned installer and CUDA build tools |
 | `requirements-dev.txt` | CPU test and package-build tools |
 | `requirements-test-torch.txt` | CPU PyTorch wheels for tests only |
 
-The reference combination is Python **3.12.x**, PyTorch **2.10.0+cu126**, and CUDA Toolkit **12.6.x**; Toolkit 12.5 and other 12.x versions are accepted for Colab and Linux. PyTorch's extension builder warns when `nvcc` and its wheels use different CUDA 12.x minor versions. CPU CI covers Python 3.12–3.14. Other direct Python dependencies and build tools use recent compatible pins; upgrading PyTorch further needs real GPU compilation and inference validation of the bundled extension. Transformers stays on 4.x to preserve the bundled pipeline APIs. Direct pins do not lock the Linux driver, system libraries, or every transitive dependency. Keep the generated environment report with GPU acceptance results when reproducing a run.
+The reference combination is Python **3.12.x**, PyTorch **2.10.0+cu126**, and CUDA Toolkit **12.6.x**; Toolkit 12.5 and other 12.x versions are accepted for Colab and Linux. PyTorch's extension builder warns when `nvcc` and its wheels use different CUDA 12.x minor versions. CPU CI covers Python 3.12–3.14. Other direct Python dependencies and build tools use recent compatible pins; upgrading PyTorch further needs real GPU compilation and inference validation of the bundled extension. Direct pins do not lock the Linux driver, system libraries, or every transitive dependency. Keep the generated environment report with GPU acceptance results when reproducing a run.
 
-The CUDA wheel versions follow the [official PyTorch 2.10 installation matrix](https://pytorch.org/get-started/previous-versions/). OpenCV's distributions share the `cv2` namespace, so the installer removes the variants and installs only the pinned headless package.
+The CUDA wheel versions follow the [official PyTorch 2.10 installation matrix](https://pytorch.org/get-started/previous-versions/). Unused generation, training, tokenizer, OpenCV and audio-framework packages have been removed from the application requirements.
 
-Run the command-line programs from a checkout or unpacked source distribution with an editable install. The source distribution includes scripts, the prompt tensor, and CUDA build sources. The Python wheel supplies the library modules and tokenizer data; it is not a standalone bundle of models, command-line scripts, and the compiled attention backend. See [TESTING.md](TESTING.md) for building and validating both distributions.
+The wheel provides the `flashvsr` console command, library modules, model manifest and fixed prompt; installed commands work outside the checkout. Large model weights and the compiled attention backend remain separate. The source distribution additionally includes legacy scripts, tests, the Colab notebook and CUDA build sources. The installation script uses an editable checkout for development. See [TESTING.md](TESTING.md) for building and validating both distributions.
 
 ## Updating an installation
 
@@ -235,7 +250,7 @@ git pull --ff-only
 bash scripts/install.sh
 ```
 
-Editable installation exposes Python source changes immediately. Rebuild the attention backend after changes to its source, PyTorch, Python, or CUDA. Download model weights only when they change or are missing.
+Editable installation exposes Python source changes immediately. Rebuild the attention backend after changes to its source, PyTorch, Python, or CUDA. Run `python -m flashvsr models check` after updates; `models download` repairs missing or corrupt weights.
 
 After updating from a version that bundled sample videos, run `python scripts/download_samples.py` to restore the default sample if needed. The installer downloads neither samples nor model weights.
 
@@ -270,7 +285,7 @@ Inference performs a real NVENC encode with the selected FFmpeg and retries fail
 
 ### CUDA memory exhaustion
 
-Use `--mode tiny --tile-dit`, reduce `--tile-size` to 128, or shorten the input. Full mode can also use `--tile-vae`. For long files, use `long_video_worker.py` with shorter segments. BF16 and FP16 both use two bytes per element, so switching between them alone does not halve memory usage.
+Use `--mode tiny --tile-dit`, reduce `--tile-size` to 128, or shorten the input. Full mode can also use `--tile-vae`. For long files, use `flashvsr long` with shorter segments. BF16 and FP16 both use two bytes per element, so switching between them alone does not halve memory usage.
 
 ### Missing weights or audio
 
@@ -281,3 +296,10 @@ Verify the filenames in the weights table and `FLASHVSR_MODEL_PATH`. If models w
 Run `python scripts/download_samples.py --list` to see valid sample paths, then download the required one. If an existing file differs from the manifest, choose another `--output-dir` or use `--force` to replace it after the new download passes verification. Interrupted or invalid downloads are discarded; rerun the same command to retry. Using your own input does not require access to the sample archive.
 
 When reporting a problem, include the Linux/Colab runtime, Python version, GPU model, `nvcc` version, PyTorch version, command, and full error output.
+
+### Logs and reports
+
+Every inference writes `OUTPUT.json`; batches also write `batch.json`, and long
+videos write a merged-output report with per-segment details. Use `--log-file results/run.jsonl --log-level DEBUG` for structured diagnostic logs. Reports
+include model identity, arguments, timings, FPS and peak CUDA memory. Retain
+these files with the generated `results/environment.json` when reporting an issue.

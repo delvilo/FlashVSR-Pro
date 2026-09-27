@@ -6,13 +6,14 @@ FlashVSR-Pro supports direct Python execution on **native Linux and Google Colab
 
 ## Features
 
-- **Unified inference:** `infer.py` selects `full`, `tiny`, or `tiny-long` mode.
+- **Unified inference:** `flashvsr infer`, `batch`, and `long` share one validated configuration and engine; select `full`, `tiny`, or `tiny-long` mode.
 - **Audio preservation:** `--keep-audio` transfers all input audio tracks to the processed video.
 - **Lower VRAM use:** `--tile-dit` splits inference into overlapping tiles; `--tile-vae` enables tiled decoding in full mode.
 - **Video alignment:** spatial and temporal padding accommodate model constraints, then output is cropped to the requested resolution and adjusted to the input frame count.
 - **GPU acceleration:** CUDA inference, TF32/cuDNN optimizations, and NVENC encoding when available, with software encoding support.
 - **Native installation:** `scripts/install.sh` installs the pinned Python dependencies and builds the bundled Block-Sparse-Attention backend.
-- **Additional workflows:** `batch_inference.py` processes a video directory; `long_video_worker.py` splits, processes, and rejoins long videos.
+- **Model management:** pinned versions, mode-specific downloads, SHA-256 verification and a shared cache.
+- **Diagnostics:** leveled logs, optional JSONL logs, and automatic JSON reports with timings, FPS, peak VRAM, model identity and parameters.
 
 ## Supported setup
 
@@ -52,17 +53,18 @@ bash scripts/install.sh
 An existing Conda environment with a supported Python version can also be used. Activate it before invoking the installer; all subprocesses use the selected Python environment.
 On distributions without Python 3.12 packages, install a matching interpreter and headers first or use a Python 3.12–3.14 Conda environment.
 
-Download the model weights into the project checkout:
+Download and verify the model weights in the versioned cache:
 
 ```bash
-python -c "from huggingface_hub import snapshot_download; snapshot_download('JunhaoZhuang/FlashVSR-v1.1', local_dir='models/FlashVSR-v1.1')"
+python -m flashvsr models download --mode all
+python -m flashvsr models check --mode all
 ```
 
 Download and run a short sample:
 
 ```bash
 python scripts/download_samples.py example0.mp4
-python infer.py -i inputs/example0.mp4 -o results/ --mode tiny --scale 4.0 --tile-dit
+python -m flashvsr infer -i inputs/example0.mp4 -o results/ --mode tiny --scale 4.0 --tile-dit
 ```
 
 Sample videos are optional downloads. Use your own input directly, or see [inputs/README.md](inputs/README.md) to list and download other samples. Downloads are checked against a pinned size and SHA-256 manifest.
@@ -71,7 +73,7 @@ After opening a new shell, activate the same environment before running inferenc
 
 ## Google Colab
 
-Open [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) in Google Colab, select an **A100 or L4 GPU runtime**, and run the cells in order. The notebook checks the GPU and toolkit, creates a dedicated Python environment in the checkout, downloads models, and runs `infer.py` as a subprocess. It downloads the default sample on demand; you can also select an uploaded video. Use a short input first.
+Open [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) in Google Colab, select an **A100 or L4 GPU runtime**, and run the cells in order. The notebook checks the GPU and toolkit, creates a dedicated Python environment in the checkout, downloads models, and runs `python -m flashvsr infer` as a subprocess. It downloads the default sample on demand; you can also select an uploaded video. Use a short input first.
 
 The complete manual workflow is in [INSTALLATION.md — Google Colab](INSTALLATION.md#google-colab). Colab's runtime storage is temporary; download results or copy them to mounted Google Drive before the runtime is reset.
 
@@ -85,12 +87,12 @@ The complete manual workflow is in [INSTALLATION.md — Google Colab](INSTALLATI
 
 ```bash
 python scripts/download_samples.py example0.mp4 example4.mp4
-python infer.py -i inputs/example0.mp4 -o results/ --mode full --tile-vae
-python infer.py -i inputs/example0.mp4 -o results/ --mode tiny --keep-audio
-python infer.py -i inputs/example4.mp4 -o results/ --mode tiny-long --tile-dit
+python -m flashvsr infer -i inputs/example0.mp4 -o results/ --mode full --tile-vae
+python -m flashvsr infer -i inputs/example0.mp4 -o results/ --mode tiny --keep-audio
+python -m flashvsr infer -i inputs/example4.mp4 -o results/ --mode tiny-long --tile-dit
 ```
 
-Long videos can still consume substantial memory during input preparation. Use `long_video_worker.py` to split large inputs into smaller segments when necessary.
+Long videos can still consume substantial memory during input preparation. Use `flashvsr long` to split large inputs into smaller segments when necessary.
 
 ## Arguments
 
@@ -114,45 +116,80 @@ Long videos can still consume substantial memory during input preparation. Use `
 | `--sparse-ratio` | Sparse attention ratio | `2.0` |
 | `--kv-ratio` | KV cache ratio | `3.0` |
 | `--local-range` | Local attention range | `11` |
-| `--metrics-json` | Write GPU memory, timing and verified output metadata | Off |
+| `--metrics-json` | Override automatic model, timing and VRAM report | `OUTPUT.json` |
+| `--model-dir`, `--model-version` | Model location and version | Shared cache, `v1.1` |
+| `--log-level`, `--log-file` | Log severity and optional JSONL file | `INFO`, stderr |
 
-The model was designed for 4× upscaling; use `--scale 4.0` for that workflow. Run `python infer.py --help` for the command-line reference. Sparse attention requires FP16/BF16 and a compatible CUDA GPU. Unsupported devices, precision, parameter values, and missing model files stop with an error; there is no CPU inference fallback.
+The model was designed for 4× upscaling; use `--scale 4.0` for that workflow. Run `python -m flashvsr infer --help` for the command-line reference. Sparse attention requires FP16/BF16 and a compatible CUDA GPU. Unsupported devices, precision, parameter values, and missing model files stop with an error; there is no CPU inference fallback.
 
-An existing directory, or an output path without a suffix, is treated as an output directory. File paths such as `results/enhanced.mp4` select an explicit output filename. User-supplied input/output paths are relative to the current working directory. Default model and prompt paths are relative to the project files.
+An existing directory, or an output path without a suffix, is treated as an output directory. File paths such as `results/enhanced.mp4` select an explicit output filename. User-supplied input/output paths are relative to the current working directory. Model files use the shared versioned cache described below.
 
-To store model weights elsewhere:
+## Model management and diagnostics
 
 ```bash
-export FLASHVSR_MODEL_PATH=/data/models/FlashVSR-v1.1
-python infer.py -i /data/input.mp4 -o /data/results/ --mode tiny --keep-audio
+python -m flashvsr models list --mode tiny
+python -m flashvsr models download --mode tiny
+python -m flashvsr models check --mode tiny
+python -m flashvsr infer -i /data/input.mp4 -o /data/enhanced.mp4 \
+  --mode tiny --keep-audio --log-level INFO --log-file results/run.jsonl
 ```
 
-The model path applies to the DiT, LQ projector, and decoder weights. The fixed prompt stays in `models/prompt_tensor/posi_prompt.pth` in the checkout. The legacy `FLASHVSR-Pro_MODEL_PATH` environment key remains readable for existing callers.
+The default model directory is `~/.cache/flashvsr/v1.1` (or `$XDG_CACHE_HOME/flashvsr/v1.1`).
+Set `FLASHVSR_CACHE_DIR` to choose another cache root. `--model-dir` or
+`FLASHVSR_MODEL_PATH` selects an exact directory, including for existing weights:
+
+```bash
+python -m flashvsr models download --model-dir ./models/FlashVSR-v1.1
+python -m flashvsr infer -i input.mp4 --model-dir ./models/FlashVSR-v1.1
+```
+
+The download command verifies and reuses valid weights, repairs corrupt files,
+and copies the packaged fixed prompt into the same directory. No models are
+downloaded implicitly during inference. The legacy `FLASHVSR-Pro_MODEL_PATH`
+environment key remains readable. The pinned model manifest is
+[`flashvsr/assets/models.json`](flashvsr/assets/models.json).
+
+Each run writes `OUTPUT.json` with stage timings, inference/end-to-end FPS,
+peak allocated/reserved VRAM, model revision/digests, package versions and all
+parameters. `--metrics-json` overrides that path. Failure reports record the
+stage and error. `--log-file` appends structured JSONL logs; `--log-level DEBUG`
+adds diagnostic details and tracebacks.
 
 ## Batch and long-video programs
 
-### Batch directory
-
 ```bash
-python batch_inference.py
+python -m flashvsr batch --input-dir inputs --output-dir results \
+  --mode tiny --scale 2 --keep-audio --tile-dit --seed 42
+python -m flashvsr long -i /data/long.mp4 -o /data/results \
+  --segment-time 00:01:00 --mode tiny --scale 2 --keep-audio --tile-dit
 ```
 
-Place your videos in `inputs/`, or download selected samples first. This recursively reads the checkout's `inputs/` directory and writes corresponding subdirectories under `results/`. It defaults to tiny mode and 2× scaling. Use `--input-dir`, `--output-dir`, `--mode`, and `--scale` to change defaults. The output directory must be outside the input tree. Edit `EXCLUDE_FILES` and `SPECIAL_CONFIGS` in the script for per-file choices. A failed child makes the batch exit with status 1 after processing the remaining files. Child processes use the same Python interpreter as the batch program.
+All three workflows accept the same mode, device, dtype, model, tiling, seed,
+quality, color, FPS and audio options. Batch input/output defaults are relative
+to the current working directory. Every eligible video is processed; there
+are no filename-specific exclusions or automatic audio exceptions. The output
+directory must be outside the input tree. A failed input is recorded and the
+remaining inputs continue; any failure makes the final exit code 1.
 
-### Split and rejoin a long video
+Long-video splits occur at existing keyframes, so segment durations are
+approximate. Segments call the same engine directly with isolated pipeline
+state. With `--keep-audio`, the original audio tracks are attached once after
+video concatenation. All outputs are verified before publication. Temporary
+segments are removed on success or failure; `--keep-temp` retains them.
 
-```bash
-python long_video_worker.py -i /data/long.mp4 -o /data/results \
-  --segment_time 00:01:00 --mode tiny --scale 2.0
-```
-
-The worker uses FFmpeg to split the source, calls `infer.py` for each segment with audio preservation, and merges the results. Splits occur at existing keyframes, so the requested duration is approximate. Each run uses a new temporary directory that is removed on success or failure. Pass `--keep-temp` to preserve segments for diagnosis. Each segment and the merged output are verified before the final file replaces an existing result.
+`infer.py`, `batch_inference.py` and `long_video_worker.py` remain thin
+compatibility entry points. `--output_dir` and `--segment_time` aliases remain
+accepted by the long-video command. Audio is opt-in with `--keep-audio` in all
+workflows. Automatic output names include mode, scale and the source filename;
+other parameters live in the JSON report. Use an explicit output file or a
+separate output directory to retain runs with different parameters.
 
 ## Project files
 
 | File or directory | Role |
 | --- | --- |
-| `infer.py` | Main inference entry point |
+| `flashvsr/cli.py`, `flashvsr/engine.py` | Unified CLI and inference core |
+| `infer.py` | Compatibility entry point |
 | `batch_inference.py` | Recursive batch processing |
 | `long_video_worker.py` | Segment processing and concatenation |
 | `scripts/install.sh` | Linux/Colab dependency and CUDA extension installation |
@@ -160,9 +197,11 @@ The worker uses FFmpeg to split the source, calls `infer.py` for each segment wi
 | `inputs/samples.json`, `inputs/README.md` | Pinned sample manifest and download instructions |
 | `colab/FlashVSR_Pro.ipynb` | Colab setup and inference notebook |
 | `diffsynth/pipelines/flashvsr_*.py` | Three inference pipelines |
-| `utils/` | Decoders, audio, tiling, and model loading |
+| `flashvsr/` | Configuration, workflows, media, models, logging and metrics |
+| `utils/` | Decoders, projector, tiling, CUDA and checkpoint helpers |
 | `Block-Sparse-Attention/` | Bundled sparse attention source and CUTLASS headers |
-| `models/` | Downloaded weights and bundled prompt tensor |
+| `flashvsr/assets/` | Model manifest and bundled fixed prompt |
+| `ARCHITECTURE.md` | Module boundaries, dependency trace, model and report contracts |
 | `pyproject.toml`, `setup.py` | Package metadata and compatibility entry point |
 | `requirements*.txt` | Separate runtime, CUDA, build, and CPU development dependencies |
 | `scripts/validate_gpu.py`, `TESTING.md` | Three-mode GPU acceptance and test instructions |
@@ -178,7 +217,7 @@ Use the shallow clone command above for a smaller initial download. Older commit
 - **Missing CUDA compiler or library:** check `nvcc --version`, `CUDA_HOME`, and the NVIDIA driver. Rebuild the backend after changing PyTorch or CUDA.
 - **Colab receives a T4/P100:** select a supported runtime. Installing another CUDA package cannot add missing GPU capabilities.
 - **Out of memory:** enable `--tile-dit`, reduce tile size (minimum 128), use `tiny`, or shorten segments. Use `--tile-vae` with full mode.
-- **Missing model files:** download the model repository into `models/FlashVSR-v1.1`, or set `FLASHVSR_MODEL_PATH`.
+- **Missing model files:** run `python -m flashvsr models download --mode all`; use the same `--model-dir` or `FLASHVSR_MODEL_PATH` as inference.
 - **Missing audio:** pass `--keep-audio`, check that the input has audio, and ensure both `ffmpeg` and `ffprobe` are installed.
 - **NVENC issues:** the selected FFmpeg must complete a real test encode before NVENC is used. If hardware encoding fails, output is retried with libx264. See [INSTALLATION.md](INSTALLATION.md#video-tools).
 

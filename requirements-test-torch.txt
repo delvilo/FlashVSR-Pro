@@ -1,5 +1,3 @@
 # CPU wheels for tests only; inference uses requirements-cuda.txt.
 --index-url https://download.pytorch.org/whl/cpu
 torch==2.10.0+cpu
-torchvision==0.25.0+cpu
-torchaudio==2.10.0+cpu
