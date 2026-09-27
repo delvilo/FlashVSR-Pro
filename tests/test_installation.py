@@ -15,14 +15,14 @@ PROJECT = Path(__file__).resolve().parents[1]
 
 
 class InstallationTests(unittest.TestCase):
-    def test_runtime_has_one_opencv_and_no_build_tools(self):
+    def test_runtime_has_no_unused_packages_or_build_tools(self):
         requirements = [Requirement(line) for line in (PROJECT / 'requirements.txt').read_text().splitlines()
                         if line.strip() and not line.startswith('#')]
         names = [canonicalize_name(item.name) for item in requirements]
         self.assertEqual(len(names), len(set(names)))
-        self.assertEqual([name for name in names if name.startswith('opencv-')], ['opencv-python-headless'])
+        self.assertEqual([name for name in names if name.startswith('opencv-')], [])
         self.assertTrue(all(str(item.specifier).startswith('==') for item in requirements))
-        self.assertFalse(set(names) & {'pip', 'setuptools', 'wheel', 'ninja', 'build'})
+        self.assertFalse(set(names) & {'pip', 'setuptools', 'wheel', 'ninja', 'build', 'transformers', 'modelscope', 'torchvision', 'torchaudio', 'pandas'})
         metadata = tomllib.loads((PROJECT / 'pyproject.toml').read_text())
         self.assertEqual(metadata['tool']['setuptools']['dynamic']['dependencies']['file'], ['requirements.txt'])
         self.assertEqual(metadata['project']['requires-python'], '>=3.12,<3.15')

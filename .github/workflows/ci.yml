@@ -37,12 +37,21 @@ jobs:
         run: |
           python -m build --no-isolation
           python scripts/check_packages.py
+      - name: Verify installed CLI and packaged model assets outside the checkout
+        run: |
+          python -m venv /tmp/flashvsr-wheel-test
+          /tmp/flashvsr-wheel-test/bin/python -m pip install --no-deps dist/*.whl
+          cd /tmp
+          /tmp/flashvsr-wheel-test/bin/flashvsr --help
+          /tmp/flashvsr-wheel-test/bin/flashvsr models list --mode tiny
+          /tmp/flashvsr-wheel-test/bin/python -c 'from flashvsr.models import ModelRegistry; import tempfile; r = ModelRegistry(directory=tempfile.mkdtemp()); r.entries = tuple(f for f in r.entries if f.bundled); r.download(); r.check()'
       - name: Install application dependencies and editable package
         run: |
           python -m pip install -r requirements.txt
           python -m pip install --no-build-isolation --no-deps -e .
           python -m pip check
           python infer.py --help
+          python -m flashvsr models list --mode all
       - uses: actions/upload-artifact@v4
         if: matrix.python == '3.12'
         with:

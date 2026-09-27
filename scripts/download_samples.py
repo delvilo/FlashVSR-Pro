@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path, PurePosixPath
 import sys
@@ -14,6 +15,10 @@ from urllib.request import urlopen
 
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_DIR))
+from flashvsr.observability import configure_logging
+
+logger = logging.getLogger(__name__)
 MANIFEST_PATH = PROJECT_DIR / "inputs/samples.json"
 
 
@@ -43,7 +48,7 @@ def matches_sample(path, sample):
 def download_sample(base_url, name, sample, output_dir, force=False):
     destination = Path(output_dir) / name
     if matches_sample(destination, sample):
-        print(f"Already verified: {destination}")
+        logger.info("Already verified: %s", destination)
         return destination
     if destination.exists() and not force:
         raise FileExistsError(
@@ -74,7 +79,7 @@ def download_sample(base_url, name, sample, output_dir, force=False):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    print(f"Downloaded and verified: {destination}")
+    logger.info("Downloaded and verified: %s", destination)
     return destination
 
 
@@ -87,6 +92,7 @@ def main(argv=None):
     parser.add_argument("--output-dir", type=Path, default=PROJECT_DIR / "inputs")
     parser.add_argument("--force", action="store_true", help="Replace a mismatched local file after verification")
     args = parser.parse_args(argv)
+    configure_logging()
     if args.samples and (args.all or args.list):
         parser.error("Choose sample names, --all, or --list")
 
@@ -105,8 +111,11 @@ def main(argv=None):
         for name in dict.fromkeys(names):
             download_sample(manifest["base_url"], name, samples[name], output_dir, args.force)
     except (OSError, URLError, ValueError) as error:
-        print(f"Sample download failed: {error}", file=sys.stderr)
+        logger.error("Sample download failed: %s", error)
         return 1
+    except KeyboardInterrupt:
+        logger.warning("Sample download cancelled")
+        return 130
     return 0
 
 

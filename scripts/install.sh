@@ -82,9 +82,6 @@ except (RuntimeError, ValueError) as error:
 print(f"GPU: {torch.cuda.get_device_name()}")
 PY
 
-# OpenCV distributions share cv2; remove conflicting variants before installing
-# the single headless build used by native Linux and Colab.
-"$python_bin" -m pip uninstall -y opencv-python opencv-contrib-python opencv-contrib-python-headless opencv-python-headless
 "$python_bin" -m pip install -r requirements.txt
 "$python_bin" -m pip install --no-build-isolation --no-deps -e .
 
@@ -97,7 +94,7 @@ BLOCK_SPARSE_ATTN_FORCE_BUILD=TRUE "$python_bin" -m pip install \
 
 mkdir -p inputs results
 "$python_bin" -m pip check
-"$python_bin" -c 'import block_sparse_attn; import diffsynth; print("FlashVSR-Pro imports OK")'
+"$python_bin" -c 'import block_sparse_attn; from diffsynth import FlashVSRFullPipeline, FlashVSRTinyPipeline, FlashVSRTinyLongPipeline; print("FlashVSR-Pro imports OK")'
 "$python_bin" infer.py --help
 "$python_bin" - <<'REPORT'
 import importlib.metadata

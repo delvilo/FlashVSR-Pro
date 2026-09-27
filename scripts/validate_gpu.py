@@ -12,7 +12,9 @@ import tempfile
 
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT))
-from utils.cli import MODES, cuda_device, positive_float, run_cli
+from flashvsr.config import MODES
+from flashvsr.cli import positive_float, run_cli
+from flashvsr.observability import configure_logging
 from utils.media import MediaTools, atomic_output
 from utils.runtime import validate_cuda, validate_models
 
@@ -25,7 +27,7 @@ def write_report(path, report):
 def _main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path, default=PROJECT / 'results/gpu-validation')
-    parser.add_argument('--device', type=cuda_device, default='cuda')
+    parser.add_argument('--device', default='cuda')
     parser.add_argument('--max-vram-gib', type=positive_float, help='Optional per-mode peak reserved-memory ceiling')
     parser.add_argument('--timeout', type=positive_float, default=1800, help='Seconds allowed per mode')
     args = parser.parse_args(argv)
@@ -36,7 +38,9 @@ def _main(argv=None):
     report_path = run_dir / 'report.json'
     report = {'status': 'running', 'started_at': datetime.now(timezone.utc).isoformat(),
               'python': sys.version, 'results': [], 'command': sys.argv}
-    print(f'GPU acceptance report: {report_path}', flush=True)
+    configure_logging()
+    import logging
+    logging.info('GPU acceptance report: %s', report_path)
     try:
         import torch
         index = validate_cuda(torch, args.device)
@@ -75,6 +79,8 @@ def _main(argv=None):
                 raise RuntimeError(f'{mode} exited {process.returncode}; see {log_path}')
             result['output'] = media.verify_video(output, width=256, height=192, frames=17, audio_streams=1, fps=8)
             metrics = json.loads(metrics_path.read_text())
+            if metrics['status'] != 'ok' or metrics['inference_fps'] <= 0 or not metrics['models']['revision']:
+                raise RuntimeError(f'{mode} has incomplete metrics or model provenance')
             allocated, reserved = metrics['peak_allocated_bytes'], metrics['peak_reserved_bytes']
             if not 0 < allocated <= reserved <= properties.total_memory:
                 raise RuntimeError(f'{mode} reported invalid GPU memory measurements: {allocated}, {reserved}')
@@ -92,7 +98,7 @@ def _main(argv=None):
     finally:
         report['finished_at'] = datetime.now(timezone.utc).isoformat()
         write_report(report_path, report)
-    print(f'All three modes passed: {report_path}')
+    logging.info('All three modes passed: %s', report_path)
     return 0
 
 

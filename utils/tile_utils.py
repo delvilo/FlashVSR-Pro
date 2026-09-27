@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 """
 Tile utilities for FlashVSR
 Provides tiled inference for DiT and VAE to reduce VRAM usage
@@ -9,7 +12,7 @@ import numpy as np
 import math
 from typing import List, Tuple, Optional, Generator
 import warnings
-from tqdm import tqdm
+from flashvsr.progress import tqdm
 
 def calculate_tile_coords(height: int, width: int, tile_size: int, overlap: int, multiple: int = 32) -> List[Tuple[int, int, int, int]]:
     """
@@ -230,7 +233,7 @@ def apply_tiled_inference_simple(
     # Calculate tile coordinates
     coords = calculate_tile_coords(H, W, tile_size, overlap, multiple=32)
     
-    print(f"Tiled Inference: {H}x{W} -> {len(coords)} tiles")
+    logger.info(f"Tiled Inference: {H}x{W} -> {len(coords)} tiles")
     
     # Store all tile results
     output_tiles = []
@@ -250,7 +253,7 @@ def apply_tiled_inference_simple(
         else:
             msg += "..."
             
-        print(msg)
+        logger.info(msg)
 
         # Extract tile
         tile = LQ_video[:, :, :, y1:y2, x1:x2]
@@ -274,7 +277,7 @@ def apply_tiled_inference_simple(
         output_tiles.append(tile_output)
     
     # Stitch all tiles
-    print(f"Stitching {len(output_tiles)} tiles...")
+    logger.info(f"Stitching {len(output_tiles)} tiles...")
     final_output = stitch_video_tiles_back(
         output_tiles, coords, (H, W), overlap, scale=1
     )

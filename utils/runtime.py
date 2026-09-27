@@ -1,10 +1,11 @@
 """Preflight checks shared by installation, inference and GPU acceptance runs."""
 
-import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+
+from flashvsr.models import model_directory
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 
@@ -29,13 +30,6 @@ def validate_toolkit(cuda_home):
     return version.strip()
 
 
-def model_directory():
-    return Path(os.getenv(
-        "FLASHVSR_MODEL_PATH",
-        os.getenv("FLASHVSR-Pro_MODEL_PATH", str(PROJECT_DIR / "models/FlashVSR-v1.1")),
-    )).expanduser().resolve()
-
-
 def require_weight(path):
     path = Path(path)
     if not path.is_file() or path.stat().st_size == 0:
@@ -46,19 +40,11 @@ def require_weight(path):
     return path
 
 
-def validate_models(mode, model_dir=None, project_dir=PROJECT_DIR):
-    if mode not in ("full", "tiny", "tiny-long"):
-        raise ValueError(f"Unsupported inference mode: {mode}")
-    directory = model_directory() if model_dir is None else Path(model_dir)
-    names = (
-        "diffusion_pytorch_model_streaming_dmd.safetensors",
-        "LQ_proj_in.ckpt",
-        "Wan2.1_VAE.pth" if mode == "full" else "TCDecoder.ckpt",
-    )
-    for name in names:
-        require_weight(directory / name)
-    require_weight(Path(project_dir) / "models/prompt_tensor/posi_prompt.pth")
-    return directory
+def validate_models(mode, model_dir=None):
+    from flashvsr.models import ModelRegistry
+    registry = ModelRegistry(directory=model_dir)
+    registry.check(mode)
+    return registry.directory
 
 
 def validate_cuda(torch, device="cuda", dtype="bf16"):

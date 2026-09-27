@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "versions": {
+    "v1.1": {
+      "repository": "JunhaoZhuang/FlashVSR-v1.1",
+      "revision": "27561b186ded3402d7c975f4fd722e2885b6135f",
+      "architecture": {
+        "has_image_input": false,
+        "patch_size": [
+          1,
+          2,
+          2
+        ],
+        "in_dim": 16,
+        "dim": 1536,
+        "ffn_dim": 8960,
+        "freq_dim": 256,
+        "text_dim": 4096,
+        "out_dim": 16,
+        "num_heads": 12,
+        "num_layers": 30,
+        "eps": 1e-06
+      },
+      "state_dict_shape_hash": "9269f8db9040a9d860eaca435be61814",
+      "files": [
+        {
+          "name": "diffusion_pytorch_model_streaming_dmd.safetensors",
+          "bytes": 5676070392,
+          "sha256": "bd28180edcf3446c028e32fc6b731a80bf7e4da2ab4caac3186b9499964d37be",
+          "modes": [
+            "full",
+            "tiny",
+            "tiny-long"
+          ]
+        },
+        {
+          "name": "LQ_proj_in.ckpt",
+          "bytes": 575694948,
+          "sha256": "d6d011cdaaba6a52645086caa08fa04124e746f6ca568140a24007591142bfd2",
+          "modes": [
+            "full",
+            "tiny",
+            "tiny-long"
+          ]
+        },
+        {
+          "name": "TCDecoder.ckpt",
+          "bytes": 189018333,
+          "sha256": "e224bdcf2f52745cbf4d393ff5374c2ba09e90285d5d19062d2bf63b915b6161",
+          "modes": [
+            "tiny",
+            "tiny-long"
+          ]
+        },
+        {
+          "name": "Wan2.1_VAE.pth",
+          "bytes": 507609880,
+          "sha256": "38071ab59bd94681c686fa51d75a1968f64e470262043be31f7a094e442fd981",
+          "modes": [
+            "full"
+          ]
+        },
+        {
+          "name": "posi_prompt.pth",
+          "bytes": 4195504,
+          "sha256": "4601107a11e4e11a936a6b79df579e54dbc99872132bf542151f0ffd65b4b1ef",
+          "modes": [
+            "full",
+            "tiny",
+            "tiny-long"
+          ],
+          "bundled": true
+        }
+      ]
+    }
+  }
+}

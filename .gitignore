@@ -47,7 +47,7 @@ models/FlashVSR-v1.1/
 *.ckpt
 *.safetensors
 *.pth
-!models/prompt_tensor/posi_prompt.pth
+!flashvsr/assets/posi_prompt.pth
 *.bin
 *.onnx
 *.engine

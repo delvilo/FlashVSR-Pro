@@ -26,3 +26,13 @@ The CUTLASS directory is marked `linguist-vendored` in `.gitattributes` so GitHu
 ## Maintenance
 
 The old `.gitmodules` declarations were removed because these directories are ordinary tracked files, not Git submodule entries. Update bundled dependencies deliberately, preserve their licenses and local changes, and verify a Linux CUDA build after changing them. Upstream documentation links inside the retained vendor sources may point to generated pages that are no longer present locally.
+
+## Minimal DiffSynth subset
+
+`diffsynth/` retains only FlashVSR pipelines, their shared color/base code, Wan
+DiT/VAE, the flow-match scheduler and VRAM helpers. Unrelated models, pipelines,
+trainers, prompt/tokenizer data and extensions were removed after tracing the
+runtime dependency closure. The repository's Apache-2.0 license and FlashVSR
+credits remain. See [ARCHITECTURE.md](ARCHITECTURE.md) for the dependency map and
+pinned upstream model metadata. CUDA and CUTLASS algorithms are unchanged by
+this application refactor.

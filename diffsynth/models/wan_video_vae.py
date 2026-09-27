@@ -3,7 +3,7 @@ from einops import rearrange, repeat
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tqdm import tqdm
+from flashvsr.progress import tqdm
 
 CACHE_T = 2
 
@@ -45,7 +45,6 @@ class CausalConv3d(nn.Conv3d):
         padding = list(self._padding)
         if cache_x is not None and self._padding[4] > 0:
             cache_x = cache_x.to(x.device)
-            # print('cache_x.shape', cache_x.shape, 'x.shape', x.shape)
             x = torch.cat([cache_x, x], dim=2)
             padding[4] -= cache_x.shape[2]
         x = F.pad(x, padding)
@@ -635,13 +634,11 @@ class VideoVAE_(nn.Module):
         self._conv_num = count_conv3d(self.decoder)
         self._conv_idx = [0]
         self._feat_map = [None] * self._conv_num
-        # print('self._feat_map', len(self._feat_map))
         # cache encode
         if self.encoder is not None:
             self._enc_conv_num = count_conv3d(self.encoder)
             self._enc_conv_idx = [0]
             self._enc_feat_map = [None] * self._enc_conv_num
-        # print('self._enc_feat_map', len(self._enc_feat_map))
 
 
 class WanVideoVAE(nn.Module):

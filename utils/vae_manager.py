@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 # utils/vae/vae_system.py
 """
 VAE System for FlashVSR-Pro
@@ -11,9 +14,9 @@ from typing import Dict, Optional, Union, Any
 import warnings
 import os
 
-from utils.TCDecoder import build_tcdecoder, TAEW2_1DiffusersWrapper, TAEHV
+from utils.TCDecoder import build_tcdecoder
 from utils.tile_utils import vae_decode_tiled
-from utils.runtime import require_weight
+from utils.runtime import require_weight, model_directory
 from utils.weights import read_checkpoint, load_checked_state_dict
 
 
@@ -26,13 +29,13 @@ class VAESystem:
     VAE_CONFIGS = {
         "wan2.1": {
             "class": "WanVAE",
-            "default_path": "models/FlashVSR-v1.1/Wan2.1_VAE.pth",
+            "default_path": "Wan2.1_VAE.pth",
             "is_tcdecoder": False,
             "description": "High Quality, High VRAM. Ideal for quality-critical tasks"
         },
         "tcd": {
             "class": "TAEW2_1DiffusersWrapper",
-            "default_path": "models/FlashVSR-v1.1/TCDecoder.ckpt",
+            "default_path": "TCDecoder.ckpt",
             "channels": [512, 256, 128, 128],
             "is_tcdecoder": True,
             "description": "Balanced Quality, Lower VRAM. Ideal for efficient real-time processing"
@@ -65,7 +68,7 @@ class VAESystem:
         if weight_path is None:
              if config["default_path"]:
                 base_dir = (Path(model_dir).expanduser() if model_dir is not None
-                            else Path(__file__).resolve().parents[1] / "models/FlashVSR-v1.1")
+                            else model_directory())
                 weight_path = str(base_dir / Path(config["default_path"]).name)
              else:
                 weight_path = None # tcd has no weight path
@@ -86,7 +89,6 @@ class VAESystem:
         if tile_vae and hasattr(vae_model, 'decode'):
             self._wrap_decode_for_tiling(tile_size, overlap)
 
-        # print(f"VAE ready: {config['description']}")
 
         return vae_model
 
@@ -173,7 +175,7 @@ class VAESystem:
             )
 
         self.current_vae.decode = tiled_decode
-        print(f"VAE tiled decoding enabled (tile_size={tile_size}, overlap={overlap})")
+        logger.info(f"VAE tiled decoding enabled (tile_size={tile_size}, overlap={overlap})")
 
     def get_current_vae_info(self) -> Dict:
         """Get information about currently loaded VAE."""
