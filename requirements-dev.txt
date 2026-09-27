@@ -1,11 +1,10 @@
 # CPU test/build tools; tests use unittest, real FFmpeg, and CPU PyTorch.
 -r requirements-build.txt
-build==1.2.2.post1
-numpy==1.26.4
-pillow==11.0.0
-einops==0.8.1
-tqdm==4.67.1
-safetensors==0.5.3
-imageio==2.37.0
+build==1.6.1
+numpy==2.5.3
+pillow==12.3.0
+einops==0.8.2
+tqdm==4.70.1
+safetensors==0.8.0
+imageio==2.37.4
 imageio-ffmpeg==0.6.0
-tomli==2.2.1; python_version < "3.11"

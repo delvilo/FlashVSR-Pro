@@ -135,8 +135,8 @@ the generated documentation that is no longer included in the checkout.
 
 Requirements:
 
-- CUDA Toolkit 12.4.x for this FlashVSR-Pro build.
-- Python 3.10–3.12 and PyTorch 2.6.0+cu124.
+- CUDA Toolkit 12.5 or newer (12.x); Toolkit 12.6 matches the selected PyTorch wheels.
+- Python 3.12–3.14 and PyTorch 2.10.0+cu126.
 - Linux.
 
 ```sh

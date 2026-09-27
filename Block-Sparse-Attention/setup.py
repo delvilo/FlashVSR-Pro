@@ -20,7 +20,7 @@ import subprocess
 
 import urllib.request
 import urllib.error
-from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+from setuptools.command.bdist_wheel import bdist_wheel as _bdist_wheel
 
 try:
     import torch
@@ -365,10 +365,11 @@ setup(
     description="Block Sparse Attention",
     long_description=long_description,
     long_description_content_type="text/markdown",
+    license="BSD-3-Clause",
+    license_files=["LICENSE"],
     url="https://github.com/mit-han-lab/Block-Sparse-Attention",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: BSD License",
         "Operating System :: POSIX :: Linux",
     ],
     ext_modules=ext_modules,
@@ -377,9 +378,9 @@ setup(
     else {
         "bdist_wheel": CachedWheelsCommand,
     },
-    python_requires=">=3.10,<3.13",
+    python_requires=">=3.12,<3.15",
     install_requires=[
-        "torch==2.6.0",
-        "einops==0.8.1",
+        "torch==2.10.0",
+        "einops==0.8.2",
     ],
 )

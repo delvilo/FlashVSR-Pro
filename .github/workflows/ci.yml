@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.10', '3.11', '3.12']
+        python: ['3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -44,7 +44,7 @@ jobs:
           python -m pip check
           python infer.py --help
       - uses: actions/upload-artifact@v4
-        if: matrix.python == '3.11'
+        if: matrix.python == '3.12'
         with:
           name: python-distributions
           path: dist/*

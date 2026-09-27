@@ -33,7 +33,7 @@ def main():
         dependencies = metadata.get_all('Requires-Dist')
         if len([item for item in dependencies if item.startswith('opencv-')]) != 1:
             raise RuntimeError('Wheel metadata must select exactly one OpenCV distribution')
-        if metadata['Requires-Python'] != '<3.13,>=3.10':
+        if metadata['Requires-Python'] != '<3.15,>=3.12':
             raise RuntimeError('Unexpected Python version range in wheel metadata')
     print(f'Distributions verified: {archive.name}, {wheel.name}')
 

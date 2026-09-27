@@ -12,20 +12,20 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 def validate_python():
     if not sys.platform.startswith("linux"):
         raise RuntimeError("FlashVSR-Pro supports native Linux and Google Colab only")
-    if not (3, 10) <= sys.version_info[:2] <= (3, 12):
-        raise RuntimeError("Use Python 3.10–3.12 with the pinned dependencies")
+    if not (3, 12) <= sys.version_info[:2] < (3, 15):
+        raise RuntimeError("Use Python 3.12–3.14 with the pinned CUDA wheels")
 
 
 def validate_toolkit(cuda_home):
-    """Require the same toolkit minor version as the cu124 wheel baseline."""
+    """CUDA 12.5+ compilers can build the cu126 wheel's extension for sm_80/90."""
     validate_python()
     compiler = Path(cuda_home) / "bin/nvcc"
     if not compiler.is_file():
         raise RuntimeError(f"CUDA compiler not found: {compiler}")
     version = subprocess.check_output([str(compiler), "--version"], text=True)
     match = re.search(r"release (\d+)\.(\d+)", version)
-    if not match or tuple(map(int, match.groups())) != (12, 4):
-        raise RuntimeError("Use CUDA Toolkit 12.4 with PyTorch 2.6.0+cu124; set CUDA_HOME to that toolkit")
+    if not match or not (12, 5) <= tuple(map(int, match.groups())) < (13, 0):
+        raise RuntimeError("Use CUDA Toolkit 12.5 or newer (12.x) with PyTorch 2.10.0+cu126; set CUDA_HOME to that toolkit")
     return version.strip()
 
 
@@ -69,8 +69,8 @@ def validate_cuda(torch, device="cuda", dtype="bf16"):
         raise ValueError("The sparse backend requires fp16 or bf16")
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is unavailable. Check the NVIDIA driver or select a Colab GPU runtime.")
-    if torch.__version__.split("+")[0] != "2.6.0" or torch.version.cuda != "12.4":
-        raise RuntimeError("This baseline requires PyTorch 2.6.0+cu124 with CUDA 12.4; run scripts/install.sh")
+    if torch.__version__.split("+")[0] != "2.10.0" or torch.version.cuda != "12.6":
+        raise RuntimeError("This baseline requires PyTorch 2.10.0+cu126; run scripts/install.sh")
     index = int(device.split(":")[1]) if ":" in device else torch.cuda.current_device()
     if not 0 <= index < torch.cuda.device_count():
         raise ValueError(f"CUDA device index is unavailable: {device}")
