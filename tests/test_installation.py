@@ -10,6 +10,7 @@ import unittest
 import tomllib
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +27,15 @@ class InstallationTests(unittest.TestCase):
         metadata = tomllib.loads((PROJECT / 'pyproject.toml').read_text())
         self.assertEqual(metadata['tool']['setuptools']['dynamic']['dependencies']['file'], ['requirements.txt'])
         self.assertEqual(metadata['project']['requires-python'], '>=3.13,<3.15')
+        self.assertIn('torch==2.11.0', (PROJECT / 'requirements.txt').read_text().splitlines())
+        self.assertIn('torch==2.11.0+cu128', (PROJECT / 'requirements-cuda.txt').read_text().splitlines())
+        self.assertIn('--index-url https://download.pytorch.org/whl/cu128', (PROJECT / 'requirements-cuda.txt').read_text().splitlines())
+        # torch 2.11 requires setuptools<82; do not pin a conflicting build backend.
+        backend = tomllib.loads((PROJECT / 'Block-Sparse-Attention/pyproject.toml').read_text())
+        build_pins = (PROJECT / 'requirements-build.txt').read_text().splitlines()
+        for requirement in (metadata['build-system']['requires'], backend['build-system']['requires'], build_pins):
+            version = next(item.split('==')[1] for item in requirement if item.startswith('setuptools=='))
+            self.assertLess(Version(version), Version('82'))
 
     def test_installer_help_and_usage(self):
         help_result = subprocess.run(['bash', str(PROJECT / 'scripts/install.sh'), '--help'], capture_output=True)
