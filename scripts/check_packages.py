@@ -15,6 +15,7 @@ def main():
     with tarfile.open(archive) as package:
         names = {name.split('/', 1)[1] for name in package.getnames() if '/' in name}
         required = {'pyproject.toml', 'requirements.txt', 'scripts/install.sh', 'scripts/validate_gpu.py',
+                    'COLAB.md', 'colab/FlashVSR_Pro.ipynb', 'flashvsr/colab/workflow.py',
                     'flashvsr/assets/posi_prompt.pth', 'flashvsr/assets/models.json', 'flashvsr/engine.py', 'Block-Sparse-Attention/pyproject.toml',
                     'Block-Sparse-Attention/csrc/cutlass/include/cutlass/cutlass.h',
                     'Block-Sparse-Attention/csrc/cutlass/LICENSE.txt'}
@@ -27,7 +28,9 @@ def main():
             raise RuntimeError('Generated docs or sample videos leaked into the source distribution')
     with zipfile.ZipFile(wheel) as package:
         names = package.namelist()
-        if not {'flashvsr/engine.py', 'flashvsr/cli.py', 'flashvsr/assets/models.json', 'flashvsr/assets/posi_prompt.pth'} <= set(names):
+        if not {'flashvsr/engine.py', 'flashvsr/cli.py', 'flashvsr/colab/__main__.py', 'flashvsr/colab/workflow.py',
+                'flashvsr/colab/setup.py', 'flashvsr/colab/cache.py', 'flashvsr/colab/storage.py',
+                'flashvsr/assets/models.json', 'flashvsr/assets/posi_prompt.pth'} <= set(names):
             raise RuntimeError('Wheel is missing application modules or model data')
         if any(name.startswith('diffsynth/tokenizer_configs/') for name in names):
             raise RuntimeError('Unused tokenizer data leaked into wheel')
@@ -35,7 +38,7 @@ def main():
         dependencies = metadata.get_all('Requires-Dist')
         if any(item.split('=')[0] in {'opencv-python', 'opencv-python-headless', 'transformers', 'modelscope', 'torchvision', 'torchaudio'} for item in dependencies):
             raise RuntimeError('Unused dependencies leaked into wheel metadata')
-        if metadata['Requires-Python'] != '<3.15,>=3.12':
+        if metadata['Requires-Python'] != '<3.15,>=3.13':
             raise RuntimeError('Unexpected Python version range in wheel metadata')
     print(f'Distributions verified: {archive.name}, {wheel.name}')
 

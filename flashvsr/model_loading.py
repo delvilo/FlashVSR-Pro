@@ -6,6 +6,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def reset_pipeline(pipe):
+    """Discard video-dependent state while retaining weights and fixed-prompt KV."""
+    if pipe.dit is not None:
+        projector = getattr(pipe.dit, "LQ_proj_in", None)
+        if projector is not None:
+            projector.clear_cache()
+        for block in pipe.dit.blocks:
+            block.self_attn.local_attn_mask = None
+    decoder = getattr(pipe, "TCDecoder", None)
+    if decoder is not None:
+        decoder.clean_mem()
+    vae = getattr(pipe, "vae", None)
+    if vae is not None:
+        vae.clear_cache()
+
+
 @contextmanager
 def load_pipeline(config, registry):
     # Heavy imports happen only after the engine has verified files and CUDA.

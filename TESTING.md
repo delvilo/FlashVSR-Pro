@@ -4,7 +4,7 @@ The CPU suite checks installation metadata, arguments, missing or corrupt weight
 
 ## CPU environment
 
-From a checkout using Linux and Python 3.12–3.14:
+From a checkout using Linux and Python 3.13–3.14:
 
 ```bash
 python3 -m venv .venv-test
@@ -23,11 +23,11 @@ The tests cover safe sample downloads, invalid CLI parameters, help before depen
 
 `check_packages.py` inspects the built wheel and source archive, checking package metadata, the model manifest, packaged prompt, CLI, CUDA sources, licenses, and absence of tokenizer data. The installed CLI also works outside the checkout, with the separately compiled backend; see [INSTALLATION.md](INSTALLATION.md#package-and-development-layout).
 
-The `Linux CPU checks` workflow runs the tests, builds both distributions, installs application dependencies with CPU wheels, and runs `pip check` on Python 3.12, 3.13 and 3.14. The installer is not fully executed on a CPU runner; its preflight failures are tested. CUDA extension compilation belongs to GPU acceptance.
+The `Linux CPU checks` workflow runs the tests, builds both distributions, installs application dependencies with CPU wheels, and runs `pip check` on Python 3.13 and 3.14. The installer is not fully executed on a CPU runner; its preflight failures are tested. CUDA extension compilation belongs to GPU acceptance.
 
 ## Real GPU acceptance
 
-Use native Linux or the provided Colab notebook with an Ampere/Ada/Hopper GPU, CUDA Toolkit 12.5+ (12.x), the installed backend, and all model weights. The reference Python version is 3.12; Python 3.13 and 3.14 are included in the CPU CI. Toolkit 12.5 with cu126 wheels produces a minor-version warning during extension compilation; GPU acceptance is needed to verify that combination on the actual hardware.
+Use native Linux with an Ampere/Ada/Hopper GPU, CUDA Toolkit 12.8+ (12.x), the installed backend, and all model weights. The Colab notebook specifically targets A100/L4, Ubuntu 24.04, native Python 3.13, PyTorch 2.11.0+cu128 and Toolkit 12.8. Python 3.13 and 3.14 are included in the CPU CI. Toolkit 12.9 with cu128 wheels may produce a minor-version warning during Linux extension compilation; GPU acceptance is needed to verify that combination on the actual hardware.
 
 ```bash
 bash scripts/install.sh
@@ -35,6 +35,8 @@ python -m flashvsr models download --mode all
 python scripts/validate_gpu.py
 # Optional memory ceiling (choose one appropriate for your GPU):
 python scripts/validate_gpu.py --max-vram-gib 22
+# Include two bounded segments, one model load and completed-job resume per mode:
+python scripts/validate_gpu.py --include-long
 ```
 
 Each run creates a new directory under `results/gpu-validation/` and generates its own 128×96, 17-frame, 8 FPS input with one audio track. It launches **full**, **tiny**, and **tiny-long** in separate subprocesses, with 2× scaling and tiled DiT; full also enables tiled VAE decoding. All weights, including the full-mode VAE, must exist before the run starts.
@@ -43,11 +45,21 @@ A passing run requires all three outputs to have **256×192 pixels, 17 frames, 8
 
 This is a correctness and memory baseline for a small synthetic input, not a visual-quality benchmark or a guarantee that longer/higher-resolution videos fit in VRAM. Compare runs on the same GPU, toolkit, weights, mode settings, and input before drawing performance conclusions. Metrics include model loading and preprocessing in peak memory; inference timing is synchronized with CUDA.
 
-The Colab notebook has an optional final acceptance cell. The manually dispatched `GPU acceptance` workflow uses a runner labeled `self-hosted`, `linux`, `x64`, and `flashvsr-gpu`. Configure that runner's Python, CUDA 12.5+ toolkit (12.x), and `FLASHVSR_MODEL_PATH` pointing to verified weights (including `posi_prompt.pth`) outside the checkout. Run `flashvsr models download --mode all` once using that directory. The workflow installs/builds the project and uploads reports and logs even if validation fails. GPU jobs do not run automatically for pull requests.
+The Colab notebook has an optional final acceptance cell, using `python -m flashvsr.colab setup --mode all` and `python -m flashvsr.colab validate`. Computation runs locally; evidence, including failure logs when space permits, is copied and verified within the same Drive budget. Execute it on an actual A100 and L4 separately. Also interrupt a representative notebook job after a saved segment, reset the VM, rerun setup, and resume with the saved code/settings. Confirm that the compiled wheel is reused, only remaining segments infer, and results/audio are preserved. Local filesystem simulations cannot establish Google Drive mount durability or Colab image compatibility.
+
+The manually dispatched `GPU acceptance` workflow uses a runner labeled `self-hosted`, `linux`, `x64`, and `flashvsr-gpu`. Configure that runner's Python 3.13 or 3.14, CUDA 12.8+ toolkit (12.x), and `FLASHVSR_MODEL_PATH` pointing to verified weights (including `posi_prompt.pth`) outside the checkout. Run `flashvsr models download --mode all` once using that directory. The workflow installs/builds the project and uploads reports and logs even if validation fails. GPU jobs do not run automatically for pull requests.
 
 A CPU test pass or a supplied GPU script is **not a GPU acceptance result**. Publish the generated report only after running it on actual supported hardware.
 
+`--include-long` also processes the fixture as 9+8-frame segments for every mode,
+checks resolution/frame count/audio and each segment's memory, requires one model
+load and a reused second call, then resumes the completed job and requires zero
+model loads. The self-hosted GPU workflow enables this check. Inspect temporal
+boundaries on representative footage separately; the small fixture cannot assess seams.
+
 ## Architecture regression coverage
+
+Colab tests use real temporary files and FFmpeg with a CPU inference double. They simulate a destroyed local runtime, resume from Drive checkpoints, corrupt models/wheels/segments, failed segment/final uploads, retry after interrupted job registration, storage-budget exhaustion, unsupported runtime/GPU rejection, build-cache identity changes, cached-kernel failure/rebuild, and failed GPU validation report preservation. Notebook code cells are syntax-checked. CUDA builds and operations are mocked here and must pass the separate GPU gate above.
 
 The suite additionally covers shared CLI configuration across all workflows,
 mode-specific model selection, cache precedence, pinned revision URLs, missing,
@@ -57,6 +69,14 @@ reports, model provenance, phase timings, FPS, memory fields and resource cleanu
 using CPU test doubles. Real FFmpeg tests exercise long-video concatenation and
 preserve multiple original audio tracks, as well as retaining previous output
 when a segment fails.
+
+Long-job tests use real FFmpeg with a long-GOP source and a five-frame buffer
+ceiling, including a short final segment. They verify lossless pixel order,
+buffer release, cancellation/resume, cached-segment corruption, changed settings,
+exclusive job locks, final encoding failure/retry, NVENC software fallback and
+completed jobs requiring no model load. CPU model doubles verify that a session
+loads once, clears per-video state, evicts failed models and closes on interruption.
+These tests do not establish visual continuity or GPU memory behavior at boundaries.
 
 A subprocess imports all three retained pipelines with only the compiled
 attention function stubbed, and instantiates the manifest DiT architecture on

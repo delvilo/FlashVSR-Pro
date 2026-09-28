@@ -1,7 +1,7 @@
-"""Shared execution core; a fresh pipeline lifecycle isolates each input."""
+"""Shared execution core with optional model reuse and isolated per-video caches."""
 
 import gc
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 import logging
 import os
 import random
@@ -31,8 +31,65 @@ class InferenceEngine:
         self.config = config
         self.media = media
         self.registry = registry or ModelRegistry(config.model_version, config.model_dir)
+        self._resources = None
+        self._pipe = None
+        self._verified = False
+        self.model_loads = 0
 
-    def run(self, source, destination, metrics_json=None):
+    @contextmanager
+    def session(self):
+        """Keep one model resident until the job exits, including on interruption."""
+        if self._resources is not None:
+            raise RuntimeError("Inference sessions cannot be nested")
+        self._resources = ExitStack()
+        try:
+            self.registry.check(self.config.mode)
+            self._verified = True
+            yield self
+        finally:
+            self._release_pipeline()
+            self._resources = None
+            self._verified = False
+
+    def _release_pipeline(self):
+        had_pipeline = self._pipe is not None
+        self._pipe = None
+        if self._resources is not None:
+            self._resources.close()
+        if had_pipeline:
+            import torch
+            gc.collect()
+            torch.cuda.empty_cache()
+
+    @contextmanager
+    def _pipeline(self, report, synchronize):
+        from .model_loading import load_pipeline, reset_pipeline
+        with ExitStack() as fresh:
+            report.data["model_reused"] = self._pipe is not None
+            try:
+                with report.stage("model_load", synchronize):
+                    if self._pipe is not None:
+                        pipe = self._pipe
+                    else:
+                        resources = self._resources if self._resources is not None else fresh
+                        pipe = resources.enter_context(load_pipeline(self.config, self.registry))
+                        self.model_loads += 1
+                        if self._resources is not None:
+                            self._pipe = pipe
+                    reset_pipeline(pipe)
+                try:
+                    yield pipe
+                finally:
+                    reset_pipeline(pipe)
+            except BaseException:
+                # A failed invocation must never leave a partially initialized model
+                # or decoder cache available to a later input.
+                self._release_pipeline()
+                self._verified = False
+                raise
+
+    def run(self, source, destination, metrics_json=None, *, input_frames=None, media_info=None,
+            frame_start=0, lossless=False):
         config = self.config
         source = validate_input(source)
         destination = output_path(source, destination, config)
@@ -45,10 +102,15 @@ class InferenceEngine:
             logger.info("Starting %s: %s", config.mode, source)
             logger.debug("Parameters: %s", config.as_dict())
             with report.stage("preflight"):
-                self.registry.check(config.mode)
+                if not self._verified:
+                    self.registry.check(config.mode)
                 if self.media is None:
                     self.media = MediaTools()
-                info = self.media.verify_video(source) if source.is_file() else None
+                info = media_info if input_frames is not None else self.media.verify_video(source) if source.is_file() else None
+                if input_frames is not None:
+                    if info is None or len(input_frames) != info["frames"]:
+                        raise ValueError("Buffered input must match its segment metadata")
+                    report.data["frame_start"] = frame_start
                 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128")
                 os.environ["IMAGEIO_FFMPEG_EXE"] = self.media.ffmpeg
                 import torch
@@ -59,12 +121,13 @@ class InferenceEngine:
                                    ffmpeg_version=str(getattr(self.media, "ffmpeg_version", "unknown")),
                                    ffprobe=self.media.ffprobe)
             try:
-                self._execute(source, destination, info, report, torch)
+                self._execute(source, destination, info, report, torch, input_frames, lossless)
             finally:
                 report.data.update(peak_allocated_bytes=torch.cuda.max_memory_allocated(config.device),
                                    peak_reserved_bytes=torch.cuda.max_memory_reserved(config.device))
                 gc.collect()
-                torch.cuda.empty_cache()
+                if self._pipe is None:
+                    torch.cuda.empty_cache()
         except BaseException as exc:
             error = exc
             logger.error("Failed during %s: %s", report.data.get("stage", "startup"), exc,
@@ -86,9 +149,8 @@ class InferenceEngine:
                 run_id.reset(token)
         return data
 
-    def _execute(self, source, destination, info, report, torch):
-        from .frames import prepare_input_tensor, tensor2video
-        from .model_loading import load_pipeline
+    def _execute(self, source, destination, info, report, torch, input_frames=None, lossless=False):
+        from .frames import prepare_input_tensor, prepare_frame_tensor, tensor2video
         import numpy as np
 
         config = self.config
@@ -102,12 +164,14 @@ class InferenceEngine:
         torch.cuda.reset_peak_memory_stats(config.device)
         synchronize = lambda: torch.cuda.synchronize(config.device)
         dtype = {"fp16": torch.float16, "bf16": torch.bfloat16}[config.dtype]
-        with ExitStack() as resources:
-            with report.stage("model_load", synchronize):
-                pipe = resources.enter_context(load_pipeline(config, self.registry))
+        with self._pipeline(report, synchronize) as pipe:
             with report.stage("decode", synchronize):
-                lq, height, width, count, fps, audio_source, original, exact_h, exact_w = prepare_input_tensor(
-                    str(source), config.scale, dtype, config.device, media_info=info)
+                if input_frames is None:
+                    prepared = prepare_input_tensor(str(source), config.scale, dtype, config.device, media_info=info)
+                else:
+                    prepared = prepare_frame_tensor(input_frames, len(input_frames), info["width"], info["height"],
+                                                    info["fps"], config.scale, dtype, config.device)
+                lq, height, width, count, fps, audio_source, original, exact_h, exact_w = prepared
                 fps = config.fps or fps
             options = pipeline_options(config, lq, height, width, count)
             report.data["effective"] = {"height": height, "width": width, "padded_frames": count,
@@ -137,7 +201,7 @@ class InferenceEngine:
             with report.stage("encode"):
                 output = self.media.save_video(frames, destination, fps=fps, quality=config.quality,
                                                audio_source=audio_source if config.keep_audio else None,
-                                               device_index=torch.cuda.current_device())
+                                               device_index=torch.cuda.current_device(), lossless=lossless)
             report.data.update(output)
             report.data.update(peak_allocated_bytes=torch.cuda.max_memory_allocated(config.device),
                                peak_reserved_bytes=torch.cuda.max_memory_reserved(config.device))

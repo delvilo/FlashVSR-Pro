@@ -87,6 +87,8 @@ Desktop.ini
 
 # Temporary chunks produced by long_video_worker.py
 temp_work_*/
+*.mp4.job/
+flashvsr-jobs/
 
 # Generated third-party documentation (available from upstream)
 /Block-Sparse-Attention/csrc/cutlass/docs/

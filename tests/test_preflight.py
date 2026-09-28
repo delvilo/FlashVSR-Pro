@@ -24,11 +24,11 @@ class PreflightTests(unittest.TestCase):
         self.root = Path(self.temp.name)
 
     def test_python_requires_supported_cuda_wheels(self):
-        for version in ((3, 10), (3, 11), (3, 15)):
+        for version in ((3, 11), (3, 12), (3, 15)):
             with self.subTest(version=version), patch('utils.runtime.sys.version_info', version):
-                with self.assertRaisesRegex(RuntimeError, 'Python 3.12–3.14'):
+                with self.assertRaisesRegex(RuntimeError, 'Python 3.13–3.14'):
                     validate_python()
-        for version in ((3, 12), (3, 13), (3, 14)):
+        for version in ((3, 13), (3, 14)):
             with self.subTest(version=version), patch('utils.runtime.sys.version_info', version):
                 validate_python()
 
@@ -57,7 +57,7 @@ class PreflightTests(unittest.TestCase):
             require_weight(path)
 
     def test_cuda_rejects_cpu_and_unsupported_hardware_before_set_device(self):
-        torch = SimpleNamespace(__version__='2.10.0+cu126', version=SimpleNamespace(cuda='12.6'), cuda=MagicMock())
+        torch = SimpleNamespace(__version__='2.11.0+cu128', version=SimpleNamespace(cuda='12.8'), cuda=MagicMock())
         torch.cuda.is_available.return_value = False
         with self.assertRaisesRegex(RuntimeError, 'CUDA is unavailable'):
             validate_cuda(torch)
@@ -76,22 +76,26 @@ class PreflightTests(unittest.TestCase):
             validate_cuda(torch, 'cuda:1')
         with self.assertRaisesRegex(ValueError, 'CPU inference'):
             validate_cuda(torch, 'cpu')
-        torch.version.cuda = '12.4'
-        with self.assertRaisesRegex(RuntimeError, 'cu126'):
+        torch.version.cuda = '12.6'
+        with self.assertRaisesRegex(RuntimeError, 'cu128'):
+            validate_cuda(torch)
+        torch.version.cuda = '12.8'
+        torch.__version__ = '2.11.0+cpu'
+        with self.assertRaisesRegex(RuntimeError, 'cu128'):
             validate_cuda(torch)
 
     def test_toolkit_must_match_baseline(self):
         nvcc = self.root / 'bin/nvcc'
         nvcc.parent.mkdir()
         nvcc.touch()
-        with patch('utils.runtime.subprocess.check_output', return_value='Cuda compilation tools, release 12.4, V12.4.0'):
-            with self.assertRaisesRegex(RuntimeError, 'Toolkit 12.5'):
+        with patch('utils.runtime.subprocess.check_output', return_value='Cuda compilation tools, release 12.7, V12.7.0'):
+            with self.assertRaisesRegex(RuntimeError, 'Toolkit 12.8'):
                 validate_toolkit(self.root)
-        for minor in (5, 6, 8):
+        for minor in (8, 9):
             with self.subTest(minor=minor), patch('utils.runtime.subprocess.check_output', return_value=f'Cuda compilation tools, release 12.{minor}, V12.{minor}.0'):
                 self.assertIn(f'12.{minor}', validate_toolkit(self.root))
         with patch('utils.runtime.subprocess.check_output', return_value='Cuda compilation tools, release 13.0, V13.0.0'):
-            with self.assertRaisesRegex(RuntimeError, 'Toolkit 12.5'):
+            with self.assertRaisesRegex(RuntimeError, 'Toolkit 12.8'):
                 validate_toolkit(self.root)
 
     def test_input_and_output_validation(self):

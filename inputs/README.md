@@ -1,6 +1,6 @@
 # Optional sample videos
 
-The checkout contains the sample manifest, not the video binaries. From the project directory, use Python 3.12–3.14 to download only what you need:
+The checkout contains the sample manifest, not the video binaries. From the project directory, use Python 3.13–3.14 to download only what you need:
 
 ```bash
 # Default: example0.mp4

@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.12', '3.13', '3.14']
+        python: ['3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,6 +43,7 @@ jobs:
           /tmp/flashvsr-wheel-test/bin/python -m pip install --no-deps dist/*.whl
           cd /tmp
           /tmp/flashvsr-wheel-test/bin/flashvsr --help
+          /tmp/flashvsr-wheel-test/bin/python -m flashvsr.colab --help
           /tmp/flashvsr-wheel-test/bin/flashvsr models list --mode tiny
           /tmp/flashvsr-wheel-test/bin/python -c 'from flashvsr.models import ModelRegistry; import tempfile; r = ModelRegistry(directory=tempfile.mkdtemp()); r.entries = tuple(f for f in r.entries if f.bundled); r.download(); r.check()'
       - name: Install application dependencies and editable package
@@ -53,7 +54,7 @@ jobs:
           python infer.py --help
           python -m flashvsr models list --mode all
       - uses: actions/upload-artifact@v4
-        if: matrix.python == '3.12'
+        if: matrix.python == '3.13'
         with:
           name: python-distributions
           path: dist/*

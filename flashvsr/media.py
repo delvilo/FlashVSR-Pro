@@ -207,7 +207,9 @@ class MediaTools:
             arguments += ["-preset", "veryfast", "-crf", quality_value]
         elif codec == "libvpx-vp9":
             arguments += ["-deadline", "good", "-cpu-used", "4", "-crf", quality_value, "-b:v", "0"]
-        if codec != "gif":
+        if codec == "ffv1":
+            arguments += ["-level", "3", "-pix_fmt", "bgr0"]
+        elif codec != "gif":
             arguments += ["-pix_fmt", "yuv420p" if width % 2 == height % 2 == 0 else "yuv444p"]
         if audio_source is not None:
             arguments += [
@@ -255,7 +257,7 @@ class MediaTools:
                 detail = errors.read().decode("utf-8", errors="replace").strip()
                 raise MediaError(f"{codec} encoding failed (exit {code}): {detail}")
 
-    def save_video(self, frames, destination, fps=30, quality=10, audio_source=None, device_index=0):
+    def save_video(self, frames, destination, fps=30, quality=10, audio_source=None, device_index=0, lossless=False):
         import numpy as np
 
         # Frames must be replayable so a failed NVENC encode can retry on the CPU.
@@ -281,7 +283,11 @@ class MediaTools:
         if first.ndim != 3 or first.shape[2] != 3 or first.dtype != np.uint8:
             raise MediaError("Video frames must be RGB uint8 arrays")
         height, width = first.shape[:2]
-        if suffix == ".gif":
+        if lossless:
+            if suffix != ".mkv" or audio_source is not None:
+                raise MediaError("Lossless job segments require silent Matroska output")
+            codecs = ["ffv1"]
+        elif suffix == ".gif":
             codecs = ["gif"]
         elif suffix == ".webm":
             codecs = ["libvpx-vp9"]
@@ -293,7 +299,7 @@ class MediaTools:
                 elif suffix == ".avi" and self._h264_nvenc_works(device_index):
                     codecs.insert(0, "h264_nvenc")
         output_codecs = {"hevc_nvenc": "hevc", "h264_nvenc": "h264",
-                         "libx264": "h264", "libvpx-vp9": "vp9", "gif": "gif"}
+                         "libx264": "h264", "libvpx-vp9": "vp9", "gif": "gif", "ffv1": "ffv1"}
         for codec in codecs:
             try:
                 with atomic_output(destination) as temporary:
@@ -310,6 +316,57 @@ class MediaTools:
                     raise MediaError(f"Cannot save {destination}: {error}") from error
                 logger.warning("NVENC failed; retrying with libx264: %s", error)
         raise MediaError(f"No encoder succeeded: {destination}")
+
+    def encode_segments(self, paths, destination, *, fps, quality=10, audio_source=None, device_index=0):
+        """Encode lossless job segments once, with replayable NVENC fallback.
+
+        Concatenation, encoding and audio muxing stream inside FFmpeg; Python
+        stores only the segment metadata. Atomic publication retains old output.
+        """
+        if not paths:
+            raise MediaError("No completed job segments")
+        metadata = [self.verify_video(path, audio_streams=0, fps=fps, video_codec="ffv1") for path in paths]
+        width, height = metadata[0]["width"], metadata[0]["height"]
+        if any((info["width"], info["height"]) != (width, height) for info in metadata):
+            raise MediaError("Segment dimensions do not match")
+        frames = sum(info["frames"] for info in metadata)
+        audio_count = sum(s.get("codec_type") == "audio" for s in self.probe(audio_source).get("streams", [])) if audio_source else 0
+        codecs = ["libx264"]
+        if width % 2 == height % 2 == 0 and self.nvenc_works(device_index, quality):
+            codecs.insert(0, "hevc_nvenc")
+        with tempfile.TemporaryDirectory(prefix="flashvsr-encode-") as folder:
+            listing = Path(folder) / "segments.txt"
+            with listing.open("w", encoding="utf-8") as stream:
+                for path, info in zip(paths, metadata):
+                    name = str(Path(path).resolve())
+                    if "\n" in name or "\r" in name:
+                        raise MediaError("Segment paths cannot contain newlines")
+                    stream.write("file '" + name.replace("'", "'\\''") + "'\n")
+                    stream.write(f"duration {info['frames'] / fps:.9f}\n")
+            for codec in codecs:
+                try:
+                    with atomic_output(destination) as temporary:
+                        args = ["-f", "concat", "-safe", "0", "-i", listing]
+                        if audio_count:
+                            args += ["-i", audio_source]
+                        args += ["-map", "0:v:0", "-vf", f"setpts=N/({fps}*TB)", "-r", str(fps), "-c:v", codec]
+                        if codec == "hevc_nvenc":
+                            args += self._hevc_nvenc_arguments(quality, device_index)
+                        else:
+                            args += ["-preset", "veryfast", "-crf", str(int(26 - quality * 0.6))]
+                        args += ["-pix_fmt", "yuv420p" if width % 2 == height % 2 == 0 else "yuv444p", *self.cfr_arguments()]
+                        if audio_count:
+                            args += ["-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-af", "apad", "-shortest"]
+                        else:
+                            args += ["-an"]
+                        self.run([*args, "-movflags", "+faststart", temporary])
+                        result = self.verify_video(temporary, width=width, height=height, frames=frames, fps=fps,
+                                                   audio_streams=audio_count, video_codec="hevc" if codec == "hevc_nvenc" else "h264")
+                    return result
+                except (MediaError, OSError, subprocess.SubprocessError) as error:
+                    if codec != "hevc_nvenc":
+                        raise
+                    logger.warning("Final NVENC encode failed; retrying with libx264: %s", error)
 
     def mux_audio(self, video, audio_source, destination):
         info = self.verify_video(video)
