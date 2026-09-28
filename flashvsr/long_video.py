@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_long(config, source, output_dir, segment_time=60.0, keep_temp=False, metrics_json=None,
-             *, segment_frames=129, work_dir=None, resume=False):
+             *, segment_frames=129, work_dir=None, resume=False, checkpoint=None):
     if not math.isfinite(segment_time) or segment_time <= 0:
         raise ValueError("Segment duration must be finite and positive")
     if type(segment_frames) is not int or segment_frames < 1:
@@ -87,6 +87,8 @@ def run_long(config, source, output_dir, segment_time=60.0, keep_temp=False, met
                     item["status"] = "pending"
                     item.pop("report", None)
             job.save()
+            if checkpoint is not None:
+                checkpoint(job)
             pending = [item for item in job.data["segments"] if item["status"] != "done"]
             if pending:
                 # Verify weights once before decoding, then retain one model until
@@ -115,6 +117,8 @@ def run_long(config, source, output_dir, segment_time=60.0, keep_temp=False, met
                         report["segments_processed"] += 1
                         job.save()
                         active = None
+                        if checkpoint is not None:
+                            checkpoint(job)
             after = source.stat()
             if (after.st_size, after.st_mtime_ns, after.st_ctime_ns) != (source_stat.st_size, source_stat.st_mtime_ns, source_stat.st_ctime_ns):
                 raise RuntimeError("Input changed while processing; start a new job")

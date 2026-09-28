@@ -1,5 +1,5 @@
 include requirements*.txt
-include README.md INSTALLATION.md THIRD_PARTY.md TESTING.md ARCHITECTURE.md
+include README.md INSTALLATION.md THIRD_PARTY.md TESTING.md ARCHITECTURE.md COLAB.md
 include infer.py batch_inference.py long_video_worker.py
 recursive-include scripts *.py *.sh
 recursive-include tests *.py

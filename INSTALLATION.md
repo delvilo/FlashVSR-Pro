@@ -131,79 +131,24 @@ For subsequent sessions, activate the same environment. You may call the scripts
 
 ## Google Colab
 
-The ready-to-run notebook is [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb). Open it in Colab and run its cells in order.
+Use [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) with **A100 or L4**, **Ubuntu 24.04 noble**, native **Python 3.13**, **PyTorch 2.11.0+cu128** and **CUDA Toolkit 12.8**. This notebook does not support older Colab images or T4/P100. A driver reporting CUDA 13.0 in `nvidia-smi` is compatible with this baseline; the toolkit is checked using `nvcc`.
 
-### Runtime selection
+The notebook mounts Drive, diagnoses the environment, preserves Colab's matching PyTorch, and runs each stage in a fresh subprocess. It uses the native interpreter and headers, without a virtual environment or Ubuntu's potentially mismatched `python3-dev` package. Use the notebook setup command for persistent caching instead of the Linux installer.
 
-Choose **Runtime → Change runtime type → GPU**, with an **A100 or L4** when available. GPU availability varies. T4/P100 cannot run the sparse attention kernels; switching Python packages will not solve that hardware limitation.
+Models and compiled attention wheels are verified and cached in `MyDrive/FlashVSR-Pro`. Video processing uses local `/content/flashvsr` storage; every completed segment and the final result are verified and saved to Drive. The default project budget is **20 GB including a 2 GB reserve**. Lossless segments can exhaust this budget; the job stops and preserves checkpoints for resume.
 
-The notebook creates `project/.venv` using its Python version, then uses that environment's interpreter for installation, model downloads, inference, and GPU acceptance. This isolates the pinned dependencies from Colab's preinstalled packages. No Conda activation or notebook-kernel restart is needed.
+From the checkout after mounting Drive:
 
-The runtime needs Python 3.13–3.14 and a CUDA 12.8+ toolkit from the 12.x series. If a runtime's Python or toolkit is outside that range, use a compatible runtime or install the baseline environment before proceeding. If Colab supplies Python 3.12, select a Python 3.13+ runtime before using the notebook. Check toolkit availability with `nvcc --version`; do not substitute the driver version from `nvidia-smi`.
-
-### Manual cells
-
-First clone the code and install system packages:
-
-```python
-from pathlib import Path
-import subprocess
-import sys
-
-project = Path('/content/FlashVSR-Pro')
-subprocess.run(['apt-get', 'update'], check=True)
-subprocess.run(['apt-get', 'install', '-y', 'build-essential', 'git', 'git-lfs', 'ffmpeg', 'python3-dev', 'python3-venv'], check=True)
-if not project.exists():
-    subprocess.run(['git', 'clone', '--depth', '1',
-                    'https://github.com/delvilo/FlashVSR-Pro.git', str(project)], check=True)
+```bash
+python -m flashvsr.colab diagnose
+python -m flashvsr.colab setup --mode tiny
+python -m flashvsr.colab status
+python -m flashvsr.colab run --job example --input /content/drive/MyDrive/FlashVSR-Pro/inputs/input.mp4
+# Restore the same code and settings before resuming:
+python -m flashvsr.colab run --job example --resume
 ```
 
-Create and install into a dedicated Python environment:
-
-```python
-import os
-
-venv = project / '.venv'
-if not (venv / 'bin/python').exists():
-    subprocess.run([sys.executable, '-m', 'venv', str(venv)], check=True)
-project_python = str(venv / 'bin/python')
-install_env = os.environ.copy()
-install_env['FLASHVSR_PYTHON'] = project_python
-# If needed, select an installed compatible toolkit:
-# install_env['CUDA_HOME'] = '/usr/local/cuda-12.8'
-subprocess.run(['bash', 'scripts/install.sh'], cwd=project, env=install_env, check=True)
-```
-
-Download models and choose an input. The following cell uses an optional sample; replace `input_video` with an uploaded video or a path on mounted Google Drive to use your own:
-
-```python
-subprocess.run([
-    project_python, '-m', 'flashvsr', 'models', 'download', '--mode', 'all'
-], cwd=project, check=True)
-
-input_video = project / 'inputs/example0.mp4'  # Or Path('/content/input.mp4').
-output_video = Path('/content/enhanced.mp4')
-if input_video == project / 'inputs/example0.mp4':
-    subprocess.run([
-        project_python, str(project / 'scripts/download_samples.py'), 'example0.mp4'
-    ], cwd=project, check=True)
-if not input_video.is_file():
-    raise FileNotFoundError(input_video)
-subprocess.run([
-    project_python, '-m', 'flashvsr', 'infer',
-    '-i', str(input_video), '-o', str(output_video),
-    '--mode', 'tiny', '--scale', '4.0', '--tile-dit', '--keep-audio'
-], cwd=project, check=True)
-```
-
-Download the output before the runtime ends:
-
-```python
-from google.colab import files
-files.download(str(output_video))
-```
-
-Colab runtime disks are temporary. For large files, mount Google Drive and set the input/output paths there. After a runtime reset, repeat installation or restore the setup in the new runtime.
+See [COLAB.md](COLAB.md) for notebook settings, cache compatibility, Drive paths, budget management, runtime-reset recovery, result retention and optional A100/L4 GPU acceptance.
 
 ## Manual dependency installation
 
@@ -235,7 +180,7 @@ Install PyTorch before the other requirements: `requirements-cuda.txt` selects t
 | `requirements-dev.txt` | CPU test and package-build tools |
 | `requirements-test-torch.txt` | CPU PyTorch wheels for tests only |
 
-The reference combination is Python **3.13.x**, PyTorch **2.11.0+cu128**, and CUDA Toolkit **12.8.x**; later 12.x toolkits are accepted for Colab and Linux. PyTorch's extension builder warns when `nvcc` and its wheels use different CUDA 12.x minor versions. CPU CI covers Python 3.13–3.14. Other direct Python dependencies and build tools use recent compatible pins; upgrading PyTorch further needs real GPU compilation and inference validation of the bundled extension. Direct pins do not lock the Linux driver, system libraries, or every transitive dependency. Keep the generated environment report with GPU acceptance results when reproducing a run.
+The reference combination is Python **3.13.x**, PyTorch **2.11.0+cu128**, and CUDA Toolkit **12.8.x**. Native Linux also accepts Python 3.14 and later 12.x toolkits; the Colab workflow requires the exact reference baseline. PyTorch's extension builder warns when `nvcc` and its wheels use different CUDA 12.x minor versions. CPU CI covers Python 3.13–3.14. Other direct Python dependencies and build tools use recent compatible pins; upgrading PyTorch further needs real GPU compilation and inference validation of the bundled extension. Direct pins do not lock the Linux driver, system libraries, or every transitive dependency. Keep the generated environment report with GPU acceptance results when reproducing a run.
 
 The CUDA wheel versions are available from the [official PyTorch CUDA 12.8 wheel index](https://download.pytorch.org/whl/cu128/torch/). Unused generation, training, tokenizer, OpenCV and audio-framework packages have been removed from the application requirements.
 
@@ -243,7 +188,7 @@ The wheel provides the `flashvsr` console command, library modules, model manife
 
 ## Updating an installation
 
-From the checkout and active Python environment:
+For native Linux, from the checkout and active Python environment:
 
 ```bash
 git pull --ff-only
@@ -251,6 +196,8 @@ bash scripts/install.sh
 ```
 
 Editable installation exposes Python source changes immediately. Rebuild the attention backend after changes to its source, PyTorch, Python, or CUDA. Run `python -m flashvsr models check` after updates; `models download` repairs missing or corrupt weights.
+
+For Colab, select the revision in the notebook and rerun setup. Cache keys select compatible build artifacts automatically. Keep the saved code/runtime/settings when resuming an unfinished job; use a new job name after an upgrade.
 
 After updating from a version that bundled sample videos, run `python scripts/download_samples.py` to restore the default sample if needed. The installer downloads neither samples nor model weights.
 

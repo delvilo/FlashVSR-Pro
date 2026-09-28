@@ -15,12 +15,13 @@ FlashVSR-Pro supports direct Python execution on **native Linux and Google Colab
 - **Model management:** pinned versions, mode-specific downloads, SHA-256 verification and a shared cache.
 - **Diagnostics:** leveled logs, optional JSONL logs, and automatic JSON reports with timings, FPS, peak VRAM, model identity and parameters.
 - **Resumable long videos:** bounded frame buffers, lossless segment checkpoints and one model load per job invocation.
+- **Persistent Colab workflow:** A100/L4 diagnostics, verified Drive model/wheel caches, per-segment resume and automatic result preservation within a configurable storage budget.
 
 ## Supported setup
 
 | Component | Baseline |
 | --- | --- |
-| System | Linux; Google Colab with a compatible GPU runtime |
+| System | Native Linux; Colab Ubuntu 24.04 noble with A100/L4 |
 | Python | 3.13.x reference; 3.14.x compatibility target |
 | PyTorch | 2.11.0+cu128 (CUDA 12.8 wheels) |
 | CUDA Toolkit | 12.8 or newer (12.x); 12.8 matches the cu128 wheels |
@@ -74,9 +75,9 @@ After opening a new shell, activate the same environment before running inferenc
 
 ## Google Colab
 
-Open [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) in Google Colab, select an **A100 or L4 GPU runtime**, and run the cells in order. The notebook checks the GPU and toolkit, creates a dedicated Python environment in the checkout, downloads models, and runs `python -m flashvsr infer` as a subprocess. It downloads the default sample on demand; you can also select an uploaded video. Use a short input first.
+Open [colab/FlashVSR_Pro.ipynb](colab/FlashVSR_Pro.ipynb) in Google Colab, select an **A100 or L4 GPU runtime**, and run the cells in order. The notebook targets **Ubuntu 24.04 noble, native Python 3.13, PyTorch 2.11.0+cu128 and CUDA Toolkit 12.8**. It diagnoses the environment, reuses Colab's PyTorch, caches verified models/compiled kernels in Drive, and processes bounded segments locally. T4/P100 and older Colab runtimes are unsupported.
 
-The complete manual workflow is in [INSTALLATION.md — Google Colab](INSTALLATION.md#google-colab). Colab's runtime storage is temporary; download results or copy them to mounted Google Drive before the runtime is reset.
+Completed segments and final results are saved to `MyDrive/FlashVSR-Pro`; the default **20 GB budget includes a 2 GB reserve**. A runtime reset can resume the saved job with the same code and settings. Lossless checkpoints can exceed the available budget on long videos; insufficient space stops the job while preserving progress. See [COLAB.md](COLAB.md) for paths, resume, cleanup and GPU acceptance.
 
 ## Inference modes
 
@@ -145,8 +146,9 @@ python -m flashvsr infer -i input.mp4 --model-dir ./models/FlashVSR-v1.1
 ```
 
 The download command verifies and reuses valid weights, repairs corrupt files,
-and copies the packaged fixed prompt into the same directory. No models are
-downloaded implicitly during inference. The legacy `FLASHVSR-Pro_MODEL_PATH`
+and copies the packaged fixed prompt into the same directory. The general inference
+commands require prepared weights; the Colab wrapper prepares its managed cache
+before running a job. The legacy `FLASHVSR-Pro_MODEL_PATH`
 environment key remains readable. The pinned model manifest is
 [`flashvsr/assets/models.json`](flashvsr/assets/models.json).
 
@@ -199,16 +201,17 @@ Resuming may scan the decoded prefix, but does not infer it again.
 Failed/cancelled jobs always retain completed segments. Success removes segment
 files unless `--keep-temp` is set; the job record and final report remain. A
 completed resume verifies the final file and returns without loading models.
-Lossless checkpoints need disk space proportional to output duration. Keep the
-input, output and job directory on persistent storage in Colab. Frame memory is
+Lossless checkpoints need disk space proportional to output duration. The Colab
+wrapper stages locally and mirrors checkpoints to Drive; see [COLAB.md](COLAB.md).
+Frame memory is
 bounded by segment size, while job metadata grows with the number of segments.
 Temporal state resets at each boundary, so visible seams remain possible. VFR
 inputs retain their decoded frames and are normalized to the selected output FPS.
 
 `infer.py`, `batch_inference.py` and `long_video_worker.py` remain thin
 compatibility entry points. `--output_dir` and `--segment_time` aliases remain
-accepted by the long-video command. Audio is opt-in with `--keep-audio` in all
-workflows. Automatic output names include mode, scale and the source filename;
+accepted by the long-video command. Audio is opt-in with `--keep-audio` in the
+general CLI and enabled by default in the Colab wrapper. Automatic output names include mode, scale and the source filename;
 other parameters live in the JSON report. Use an explicit output file or a
 separate output directory to retain runs with different parameters.
 
@@ -220,10 +223,11 @@ separate output directory to retain runs with different parameters.
 | `infer.py` | Compatibility entry point |
 | `batch_inference.py` | Recursive batch processing |
 | `long_video_worker.py` | Segment processing and concatenation |
-| `scripts/install.sh` | Linux/Colab dependency and CUDA extension installation |
+| `scripts/install.sh` | Native Linux dependency and CUDA extension installation |
 | `scripts/download_samples.py` | Optional sample downloads with size and SHA-256 verification |
 | `inputs/samples.json`, `inputs/README.md` | Pinned sample manifest and download instructions |
 | `colab/FlashVSR_Pro.ipynb` | Colab setup and inference notebook |
+| `flashvsr/colab/`, `COLAB.md` | Colab diagnostics, caches, budgeted Drive persistence and recovery guide |
 | `diffsynth/pipelines/flashvsr_*.py` | Three inference pipelines |
 | `flashvsr/` | Configuration, workflows, media, models, logging and metrics |
 | `utils/` | Decoders, projector, tiling, CUDA and checkpoint helpers |

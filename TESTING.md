@@ -27,7 +27,7 @@ The `Linux CPU checks` workflow runs the tests, builds both distributions, insta
 
 ## Real GPU acceptance
 
-Use native Linux or the provided Colab notebook with an Ampere/Ada/Hopper GPU, CUDA Toolkit 12.8+ (12.x), the installed backend, and all model weights. The reference Python version is 3.13; Python 3.13 and 3.14 are included in the CPU CI. Toolkit 12.9 with cu128 wheels may produce a minor-version warning during extension compilation; GPU acceptance is needed to verify that combination on the actual hardware.
+Use native Linux with an Ampere/Ada/Hopper GPU, CUDA Toolkit 12.8+ (12.x), the installed backend, and all model weights. The Colab notebook specifically targets A100/L4, Ubuntu 24.04, native Python 3.13, PyTorch 2.11.0+cu128 and Toolkit 12.8. Python 3.13 and 3.14 are included in the CPU CI. Toolkit 12.9 with cu128 wheels may produce a minor-version warning during Linux extension compilation; GPU acceptance is needed to verify that combination on the actual hardware.
 
 ```bash
 bash scripts/install.sh
@@ -45,7 +45,9 @@ A passing run requires all three outputs to have **256×192 pixels, 17 frames, 8
 
 This is a correctness and memory baseline for a small synthetic input, not a visual-quality benchmark or a guarantee that longer/higher-resolution videos fit in VRAM. Compare runs on the same GPU, toolkit, weights, mode settings, and input before drawing performance conclusions. Metrics include model loading and preprocessing in peak memory; inference timing is synchronized with CUDA.
 
-The Colab notebook has an optional final acceptance cell. The manually dispatched `GPU acceptance` workflow uses a runner labeled `self-hosted`, `linux`, `x64`, and `flashvsr-gpu`. Configure that runner's Python 3.13 or 3.14, CUDA 12.8+ toolkit (12.x), and `FLASHVSR_MODEL_PATH` pointing to verified weights (including `posi_prompt.pth`) outside the checkout. Run `flashvsr models download --mode all` once using that directory. The workflow installs/builds the project and uploads reports and logs even if validation fails. GPU jobs do not run automatically for pull requests.
+The Colab notebook has an optional final acceptance cell, using `python -m flashvsr.colab setup --mode all` and `python -m flashvsr.colab validate`. Computation runs locally; evidence, including failure logs when space permits, is copied and verified within the same Drive budget. Execute it on an actual A100 and L4 separately. Also interrupt a representative notebook job after a saved segment, reset the VM, rerun setup, and resume with the saved code/settings. Confirm that the compiled wheel is reused, only remaining segments infer, and results/audio are preserved. Local filesystem simulations cannot establish Google Drive mount durability or Colab image compatibility.
+
+The manually dispatched `GPU acceptance` workflow uses a runner labeled `self-hosted`, `linux`, `x64`, and `flashvsr-gpu`. Configure that runner's Python 3.13 or 3.14, CUDA 12.8+ toolkit (12.x), and `FLASHVSR_MODEL_PATH` pointing to verified weights (including `posi_prompt.pth`) outside the checkout. Run `flashvsr models download --mode all` once using that directory. The workflow installs/builds the project and uploads reports and logs even if validation fails. GPU jobs do not run automatically for pull requests.
 
 A CPU test pass or a supplied GPU script is **not a GPU acceptance result**. Publish the generated report only after running it on actual supported hardware.
 
@@ -56,6 +58,8 @@ model loads. The self-hosted GPU workflow enables this check. Inspect temporal
 boundaries on representative footage separately; the small fixture cannot assess seams.
 
 ## Architecture regression coverage
+
+Colab tests use real temporary files and FFmpeg with a CPU inference double. They simulate a destroyed local runtime, resume from Drive checkpoints, corrupt models/wheels/segments, failed segment/final uploads, retry after interrupted job registration, storage-budget exhaustion, unsupported runtime/GPU rejection, build-cache identity changes, cached-kernel failure/rebuild, and failed GPU validation report preservation. Notebook code cells are syntax-checked. CUDA builds and operations are mocked here and must pass the separate GPU gate above.
 
 The suite additionally covers shared CLI configuration across all workflows,
 mode-specific model selection, cache precedence, pinned revision URLs, missing,

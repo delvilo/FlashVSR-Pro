@@ -23,6 +23,7 @@ flowchart TD
 | `flashvsr/engine.py` | Preflight, model lifecycle, inference, output and metrics |
 | `flashvsr/workflows.py`, `long_video.py` | Recursive batches and resumable bounded long-video processing |
 | `flashvsr/jobs.py`, `streaming.py` | Locked atomic job records, integrity checks and backpressured FFmpeg decoding |
+| `flashvsr/colab/` | Colab environment checks, wheel/model cache and budgeted Drive persistence |
 | `flashvsr/frames.py` | Decode all frames, natural image order, bicubic resize, spatial/temporal padding |
 | `flashvsr/media.py` | FFmpeg/FFprobe version detection, NVENC probe and retry, all audio tracks, atomic verified output |
 | `flashvsr/models.py`, `assets/models.json` | Model versions, cache, pinned downloads and SHA-256 verification |
@@ -165,3 +166,27 @@ when changing inference semantics. Long reports include frame offsets,
 across stored segment reports (including previous invocations).
 
 See [TESTING.md](TESTING.md) for CPU coverage and the separate real GPU gate.
+
+## Colab orchestration
+
+`flashvsr.colab` adds a notebook-facing wrapper around the existing model registry,
+media tools and bounded long-video core. `setup.py` validates the native Colab
+baseline, retains its PyTorch, and installs dependencies in fresh subprocesses.
+`cache.py` keys compiled wheels by source/build/runtime identity and requires a
+real CUDA numerical check before reuse/publication. `storage.py` provides SHA-256
+verified replacement copies, a managed Drive budget and a local setup/run lock.
+
+`workflow.py` stages inputs/models locally, pins a job's code/runtime/settings,
+and mirrors completed lossless segments to Drive through `run_long`'s optional
+checkpoint callback. The callback runs after a local segment commit and before
+the next segment; a failed upload leaves the local segment reusable. Drive data
+is copied before its manifest. On a fresh VM, valid segments are restored and
+missing/corrupt segments return to pending. General Linux commands do not enable
+Drive synchronization.
+
+Final video/report copies precede the Drive completion record; temporary segments
+are removed only after that record succeeds. Failure keeps checkpoint data.
+GPU acceptance also runs locally and uses budgeted publication. Google Drive
+FUSE read-back is not a cloud transaction or a distributed lock: one notebook
+writes each root, and a sudden VM/mount loss may still lose recent writes.
+See [COLAB.md](COLAB.md) for the 20 GB budget, native runtime and recovery contract.

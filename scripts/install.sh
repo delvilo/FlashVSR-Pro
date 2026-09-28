@@ -7,7 +7,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 Usage: bash scripts/install.sh
 
 Linux: activate a Python 3.13 or 3.14 virtual environment first.
-Colab: select an Ampere/Ada/Hopper GPU runtime and use the notebook instructions.
+Colab: use the A100/L4 notebook and native Python 3.13; see COLAB.md for Drive caching.
 Install an NVIDIA driver, CUDA Toolkit 12.8 or newer (12.x), a C++ compiler, FFmpeg and Git first.
 The supported build uses PyTorch 2.11.0+cu128 and CUDA Toolkit 12.8+ (12.x).
 
