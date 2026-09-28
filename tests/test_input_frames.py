@@ -25,7 +25,7 @@ class InputFrameTests(unittest.TestCase):
             Image.new('RGB', (13, 9), (index * 100, 50, 25)).save(self.root / f'{index}.png')
         video, height, width, count, fps, source, original, exact_h, exact_w = infer.prepare_input_tensor(
             str(self.root), scale=2.0, device='cpu', dtype=torch.float32)
-        self.assertEqual(video.shape, (1, 3, 9, 128, 128))
+        self.assertEqual(video.shape, (1, 3, 25, 128, 128))
         self.assertEqual((original, exact_h, exact_w), (2, 18, 26))
         self.assertTrue(torch.equal(video[:, :, 1], video[:, :, -1]))
 
@@ -43,6 +43,14 @@ class InputFrameTests(unittest.TestCase):
     def test_nonfinite_output_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'non-finite'):
             infer.tensor2video(torch.full((3, 1, 2, 2), float('nan')))
+
+    def test_single_frame_tail_has_lookahead_and_finite_padding(self):
+        frames = np.full((1, 8, 12, 3), 42, dtype=np.uint8)
+        video, _, _, count, _, _, original, _, _ = infer.prepare_frame_tensor(
+            frames, 1, 12, 8, 24, scale=1, device='cpu', dtype=torch.float32)
+        self.assertEqual((original, count), (1, 25))
+        self.assertTrue(torch.isfinite(video).all())
+        self.assertTrue(torch.equal(video[:, :, 0], video[:, :, -1]))
 
 
 if __name__ == '__main__':

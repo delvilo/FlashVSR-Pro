@@ -71,13 +71,14 @@ class NativeLauncherTests(unittest.TestCase):
                    '-c:v', 'libx264', '-g', '8', '-pix_fmt', 'yuv420p', '-c:a', 'aac', source])
         config = InferenceConfig(scale=1, keep_audio=True, seed=9, dtype='fp16')
         engine = MagicMock()
-        def copy_frames(part, target):
-            shutil.copyfile(part, target)
+        def copy_frames(part, target, **kwargs):
+            media.save_video(kwargs['input_frames'], target, fps=8, lossless=True)
             return {'status': 'ok', 'peak_allocated_bytes': 1}
+        engine.model_loads = 1
         engine.registry.identity.return_value = {'version': 'test', 'revision': 'test'}
         engine.run.side_effect = copy_frames
         target_dir = self.root / 'results'
-        with patch('flashvsr.workflows.InferenceEngine', return_value=engine) as factory:
+        with patch('flashvsr.long_video.InferenceEngine', return_value=engine) as factory:
             self.assertEqual(run_long(config, source, target_dir, segment_time=1), 0)
         self.assertEqual(factory.call_args.args[0], replace(config, keep_audio=False))
         self.assertEqual(engine.run.call_count, 2)
@@ -85,11 +86,11 @@ class NativeLauncherTests(unittest.TestCase):
         media.verify_video(final, width=128, height=96, frames=16, fps=8, audio_streams=2)
         previous = final.read_bytes()
         engine.run.side_effect = RuntimeError('inference failed')
-        with patch('flashvsr.workflows.InferenceEngine', return_value=engine):
+        failed_work = self.root / 'failed-job'
+        with patch('flashvsr.long_video.InferenceEngine', return_value=engine):
             with self.assertRaisesRegex(RuntimeError, 'inference failed'):
-                run_long(config, source, target_dir, segment_time=1)
-        work = engine.run.call_args.args[0].parents[1]
-        self.assertFalse(work.exists())
+                run_long(config, source, target_dir, segment_time=1, work_dir=failed_work)
+        self.assertTrue((failed_work / 'job.json').is_file())
         self.assertEqual(final.read_bytes(), previous)
         self.assertEqual(json.loads(Path(f'{final}.json').read_text())['status'], 'failed')
 

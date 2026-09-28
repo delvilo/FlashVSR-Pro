@@ -31,8 +31,10 @@ class EngineTests(unittest.TestCase):
         self.engine = InferenceEngine(self.config, self.media, self.registry)
         self.pipe = MagicMock(return_value=torch.zeros(1, 3, 9, 128, 128))
         self.closed = False
+        self.loads = 0
         @contextmanager
         def pipeline(*args):
+            self.loads += 1
             try:
                 yield self.pipe
             finally:
@@ -129,3 +131,36 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(data['run_id'], 'test-run')
         self.assertEqual(data['level'], 'WARNING')
         self.assertEqual(data['message'], '壞檔案 clip.mp4')
+
+    def test_session_reuses_weights_and_clears_video_state_between_runs(self):
+        with self.engine.session():
+            first = self.engine.run(self.source, self.destination)
+            second = self.engine.run(self.source, self.destination)
+            self.assertFalse(self.closed)
+            self.assertFalse(first['model_reused'])
+            self.assertTrue(second['model_reused'])
+        self.assertEqual(self.loads, 1)
+        self.registry.check.assert_called_once()
+        self.assertTrue(self.closed)
+        self.assertEqual(self.pipe.dit.LQ_proj_in.clear_cache.call_count, 4)
+        self.assertEqual(self.pipe.TCDecoder.clean_mem.call_count, 4)
+        self.pipe.dit.clear_cross_kv.assert_not_called()
+
+    def test_failed_session_run_discards_model_before_retry(self):
+        with self.engine.session():
+            self.media.save_video.side_effect = RuntimeError('encode failed')
+            with self.assertRaisesRegex(RuntimeError, 'encode failed'):
+                self.engine.run(self.source, self.destination)
+            self.assertIsNone(self.engine._pipe)
+            self.media.save_video.side_effect = None
+            result = self.engine.run(self.source, self.destination)
+        self.assertFalse(result['model_reused'])
+        self.assertEqual(self.loads, 2)
+
+    def test_session_closes_pipeline_on_interruption(self):
+        with self.assertRaises(KeyboardInterrupt):
+            with self.engine.session():
+                self.engine.run(self.source, self.destination)
+                raise KeyboardInterrupt
+        self.assertTrue(self.closed)
+        self.assertIsNone(self.engine._pipe)

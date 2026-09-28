@@ -35,6 +35,8 @@ python -m flashvsr models download --mode all
 python scripts/validate_gpu.py
 # Optional memory ceiling (choose one appropriate for your GPU):
 python scripts/validate_gpu.py --max-vram-gib 22
+# Include two bounded segments, one model load and completed-job resume per mode:
+python scripts/validate_gpu.py --include-long
 ```
 
 Each run creates a new directory under `results/gpu-validation/` and generates its own 128×96, 17-frame, 8 FPS input with one audio track. It launches **full**, **tiny**, and **tiny-long** in separate subprocesses, with 2× scaling and tiled DiT; full also enables tiled VAE decoding. All weights, including the full-mode VAE, must exist before the run starts.
@@ -47,6 +49,12 @@ The Colab notebook has an optional final acceptance cell. The manually dispatche
 
 A CPU test pass or a supplied GPU script is **not a GPU acceptance result**. Publish the generated report only after running it on actual supported hardware.
 
+`--include-long` also processes the fixture as 9+8-frame segments for every mode,
+checks resolution/frame count/audio and each segment's memory, requires one model
+load and a reused second call, then resumes the completed job and requires zero
+model loads. The self-hosted GPU workflow enables this check. Inspect temporal
+boundaries on representative footage separately; the small fixture cannot assess seams.
+
 ## Architecture regression coverage
 
 The suite additionally covers shared CLI configuration across all workflows,
@@ -57,6 +65,14 @@ reports, model provenance, phase timings, FPS, memory fields and resource cleanu
 using CPU test doubles. Real FFmpeg tests exercise long-video concatenation and
 preserve multiple original audio tracks, as well as retaining previous output
 when a segment fails.
+
+Long-job tests use real FFmpeg with a long-GOP source and a five-frame buffer
+ceiling, including a short final segment. They verify lossless pixel order,
+buffer release, cancellation/resume, cached-segment corruption, changed settings,
+exclusive job locks, final encoding failure/retry, NVENC software fallback and
+completed jobs requiring no model load. CPU model doubles verify that a session
+loads once, clears per-video state, evicts failed models and closes on interruption.
+These tests do not establish visual continuity or GPU memory behavior at boundaries.
 
 A subprocess imports all three retained pipelines with only the compiled
 attention function stubbed, and instantiates the manifest DiT architecture on

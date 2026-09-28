@@ -287,7 +287,7 @@ The application detects the selected FFmpeg version and uses `-fps_mode cfr` on 
 
 ### CUDA memory exhaustion
 
-Use `--mode tiny --tile-dit`, reduce `--tile-size` to 128, or shorten the input. Full mode can also use `--tile-vae`. For long files, use `flashvsr long` with shorter segments. BF16 and FP16 both use two bytes per element, so switching between them alone does not halve memory usage.
+Use `--mode tiny --tile-dit`, reduce `--tile-size` to 128, or shorten the input. Full mode can also use `--tile-vae`. For long files, use `flashvsr long --segment-frames 65 --work-dir /data/jobs/clip` with the usual input/output arguments. A failed job keeps completed segments; repeat the same command with `--resume`. Changed settings need a new job directory. BF16 and FP16 both use two bytes per element, so switching between them alone does not halve memory usage.
 
 ### Missing weights or audio
 

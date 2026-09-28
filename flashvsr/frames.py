@@ -121,25 +121,52 @@ def process_batch_gpu(batch_arr, sH: int, sW: int, tH: int, tW: int, dtype=None,
 
     return t
 
+def prepare_frame_tensor(frames, total, width, height, fps, scale=2, dtype=None, device='cuda', audio_source=None):
+    """Preallocate one input tensor; retain at most 32 unscaled frames while filling it.
+
+    Streaming pipelines need lookahead beyond the output interval, including for
+    a one-frame final segment. Repeat the last input to supply that context.
+    """
+    if total < 1 or fps <= 0:
+        raise ValueError("Frame count and FPS must be positive")
+    dtype = dtype or torch.bfloat16
+    sW, sH, tW, tH = compute_scaled_and_target_dims(width, height, scale=scale)
+    count = max(25, ((total - 1 + 7) // 8) * 8 + 1 + 16)
+    video = torch.empty((1, 3, count, tH, tW), dtype=dtype, device=device)
+    batch, offset = [], 0
+    for index, frame in enumerate(frames):
+        if index >= total:
+            raise ValueError("Decoder produced too many frames")
+        if frame.shape != (height, width, 3):
+            raise ValueError(f"Frame dimensions changed at frame {index}")
+        batch.append(frame)
+        if len(batch) == 32 or index == total - 1:
+            processed = process_batch_gpu(batch, sH, sW, tH, tW, dtype, device)
+            video[0, :, offset:offset+len(batch)].copy_(processed.permute(1, 0, 2, 3))
+            offset += len(batch)
+            batch.clear()
+            del processed
+    if offset != total:
+        raise ValueError(f"Decoder produced {offset}/{total} frames")
+    video[:, :, total:] = video[:, :, total-1:total].expand(-1, -1, count-total, -1, -1)
+    return video, tH, tW, count, fps, audio_source, total, sH, sW
+
+
 def prepare_input_tensor(path: str, scale: float = 2, dtype=None, device='cuda', media_info=None):
-    """Read every input frame and pad to 8n+1 without hiding decoder failures."""
+    """Single-input API; long jobs supply a bounded frame sequence directly."""
     if os.path.isdir(path):
         paths = list_images_natural(path)
         if not paths:
             raise FileNotFoundError(f"No images in {path}")
         with Image.open(paths[0]) as first:
             w0, h0 = first.size
-        total, fps = len(paths), 30.0
-        sW, sH, tW, tH = compute_scaled_and_target_dims(w0, h0, scale=scale)
-        count = ((total - 1 + 7) // 8) * 8 + 1
-        frames = []
-        for name in paths + [paths[-1]] * (count - total):
-            with Image.open(name) as image:
-                if image.size != (w0, h0):
-                    raise ValueError(f"Image dimensions differ from the first frame: {name}")
-                frames.append(process_frame_gpu(image.convert('RGB'), sH, sW, tH, tW, dtype, device))
-        video = torch.stack(frames, 0).permute(1, 0, 2, 3).unsqueeze(0)
-        return video, tH, tW, count, fps, None, total, sH, sW
+        def images():
+            for name in paths:
+                with Image.open(name) as image:
+                    if image.size != (w0, h0):
+                        raise ValueError(f"Image dimensions differ from the first frame: {name}")
+                    yield np.array(image.convert('RGB'))
+        return prepare_frame_tensor(images(), len(paths), w0, h0, 30.0, scale, dtype, device)
 
     if not is_video(path):
         raise ValueError(f"Unsupported input: {path}")
@@ -151,21 +178,11 @@ def prepare_input_tensor(path: str, scale: float = 2, dtype=None, device='cuda',
     try:
         first = reader.get_data(0)
         h0, w0 = first.shape[:2]
-        sW, sH, tW, tH = compute_scaled_and_target_dims(w0, h0, scale=scale)
-        count = ((total - 1 + 7) // 8) * 8 + 1
         logger.info(f"Input: {w0}x{h0}, {total} frames, {fps:.3f} FPS")
-        frames, batch = [], []
-        for index in list(range(total)) + [total - 1] * (count - total):
-            frame = reader.get_data(index)
-            if frame.shape[:2] != (h0, w0):
-                raise ValueError(f"Frame dimensions changed in {path} at frame {index}")
-            batch.append(frame)
-            if len(batch) == 32:
-                frames.append(process_batch_gpu(batch, sH, sW, tH, tW, dtype, device))
-                batch = []
-        if batch:
-            frames.append(process_batch_gpu(batch, sH, sW, tH, tW, dtype, device))
-        video = torch.cat(frames, dim=0).permute(1, 0, 2, 3).unsqueeze(0)
-        return video, tH, tW, count, fps, path, total, sH, sW
+        def frames():
+            yield first
+            for index in range(1, total):
+                yield reader.get_data(index)
+        return prepare_frame_tensor(frames(), total, w0, h0, fps, scale, dtype, device, path)
     finally:
         reader.close()

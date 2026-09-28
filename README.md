@@ -14,6 +14,7 @@ FlashVSR-Pro supports direct Python execution on **native Linux and Google Colab
 - **Native installation:** `scripts/install.sh` installs the pinned Python dependencies and builds the bundled Block-Sparse-Attention backend.
 - **Model management:** pinned versions, mode-specific downloads, SHA-256 verification and a shared cache.
 - **Diagnostics:** leveled logs, optional JSONL logs, and automatic JSON reports with timings, FPS, peak VRAM, model identity and parameters.
+- **Resumable long videos:** bounded frame buffers, lossless segment checkpoints and one model load per job invocation.
 
 ## Supported setup
 
@@ -92,7 +93,7 @@ python -m flashvsr infer -i inputs/example0.mp4 -o results/ --mode tiny --keep-a
 python -m flashvsr infer -i inputs/example4.mp4 -o results/ --mode tiny-long --tile-dit
 ```
 
-Long videos can still consume substantial memory during input preparation. Use `flashvsr long` to split large inputs into smaller segments when necessary.
+Use `flashvsr long` for bounded input memory and resumable processing. `infer` still prepares its entire input; choosing the `tiny-long` model alone does not enable job checkpoints.
 
 ## Arguments
 
@@ -161,7 +162,12 @@ adds diagnostic details and tracebacks.
 python -m flashvsr batch --input-dir inputs --output-dir results \
   --mode tiny --scale 2 --keep-audio --tile-dit --seed 42
 python -m flashvsr long -i /data/long.mp4 -o /data/results \
-  --segment-time 00:01:00 --mode tiny --scale 2 --keep-audio --tile-dit
+  --segment-frames 129 --work-dir /data/jobs/long \
+  --mode tiny --scale 2 --keep-audio --tile-dit
+# After interruption, use the SAME settings and add --resume:
+python -m flashvsr long -i /data/long.mp4 -o /data/results \
+  --segment-frames 129 --work-dir /data/jobs/long \
+  --mode tiny --scale 2 --keep-audio --tile-dit --resume
 ```
 
 All three workflows accept the same mode, device, dtype, model, tiling, seed,
@@ -171,11 +177,33 @@ are no filename-specific exclusions or automatic audio exceptions. The output
 directory must be outside the input tree. A failed input is recorded and the
 remaining inputs continue; any failure makes the final exit code 1.
 
-Long-video splits occur at existing keyframes, so segment durations are
-approximate. Segments call the same engine directly with isolated pipeline
-state. With `--keep-audio`, the original audio tracks are attached once after
-video concatenation. All outputs are verified before publication. Temporary
-segments are removed on success or failure; `--keep-temp` retains them.
+Long jobs decode sequentially and keep at most `--segment-frames` input frames
+(default 129) at once, regardless of keyframe spacing. `--segment-time` remains
+an additional limit (default 60 seconds); the smaller limit determines each
+segment. Model padding adds at most 24 repeated lookahead frames. Lower the frame
+limit and use spatial tiling when a high resolution still exceeds VRAM.
+
+Weights and fixed-prompt attention state are loaded once per invocation; video
+and decoder caches are reset between segments. Completed outputs are stored as
+lossless FFV1 files. The final encode streams from those files, using HEVC NVENC
+with software fallback, and attaches every original audio track with `--keep-audio`.
+The previous final video remains intact if encoding or verification fails.
+
+`job.json` records input SHA-256, settings, model/runtime identity, exact frame
+ranges and verified segment hashes. `--resume` rejects incompatible jobs, skips
+valid segments and recomputes missing/corrupt segments. The default job directory
+is `FINAL.mp4.job` next to the final video. A job lock prevents concurrent writers.
+An existing job needs `--resume`; use a different `--work-dir` for changed settings.
+Resuming may scan the decoded prefix, but does not infer it again.
+
+Failed/cancelled jobs always retain completed segments. Success removes segment
+files unless `--keep-temp` is set; the job record and final report remain. A
+completed resume verifies the final file and returns without loading models.
+Lossless checkpoints need disk space proportional to output duration. Keep the
+input, output and job directory on persistent storage in Colab. Frame memory is
+bounded by segment size, while job metadata grows with the number of segments.
+Temporal state resets at each boundary, so visible seams remain possible. VFR
+inputs retain their decoded frames and are normalized to the selected output FPS.
 
 `infer.py`, `batch_inference.py` and `long_video_worker.py` remain thin
 compatibility entry points. `--output_dir` and `--segment_time` aliases remain

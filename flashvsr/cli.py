@@ -32,6 +32,13 @@ def positive_float(value):
     return number
 
 
+def positive_int(value):
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
+
+
 def segment_seconds(value):
     try:
         parts = value.split(":")
@@ -88,11 +95,14 @@ def parser():
     batch = commands.add_parser("batch", help="Recursively process a video directory")
     batch.add_argument("--input-dir", type=Path, default=Path("inputs"))
     batch.add_argument("--output-dir", type=Path, default=Path("results"))
-    long = commands.add_parser("long", help="Split, process and merge a long video")
+    long = commands.add_parser("long", help="Process bounded frame segments with persistent checkpoints")
     long.add_argument("-i", "--input", required=True)
     long.add_argument("-o", "--output-dir", "--output_dir", required=True, type=Path)
     long.add_argument("--segment-time", "--segment_time", type=segment_seconds, default=60.0)
-    long.add_argument("--keep-temp", action="store_true")
+    long.add_argument("--segment-frames", type=positive_int, default=129, help="Hard limit on input frames per segment (default: 129)")
+    long.add_argument("--work-dir", type=Path, help="Persistent job directory; defaults to OUTPUT.mp4.job")
+    long.add_argument("--resume", action="store_true", help="Verify and resume an existing job with the same options")
+    long.add_argument("--keep-temp", action="store_true", help="Retain lossless segment cache after success (always retained on failure)")
     for command in (single, batch, long):
         inference_options(command)
     models = commands.add_parser("models", help="List, verify or download versioned model weights")
@@ -146,8 +156,12 @@ def _main(argv=None):
             target = output_path(args.input, args.output, config)
             protected += [args.input, target, f"{target}.json"]
         elif args.command == "long":
+            from .jobs import work_directory
             target = args.output_dir / f"FlashVSR_{Path(args.input).stem}_Final.mp4"
             protected += [args.input, target, f"{target}.json"]
+            work = work_directory(args.input, args.output_dir, args.work_dir)
+            if args.log_file.expanduser().resolve().is_relative_to(work):
+                raise ValueError("Metrics/logs must be outside the job directory")
         else:
             inputs = [path for path in args.input_dir.rglob("*") if path.is_file()]
             targets = [output_path(path, args.output_dir / path.relative_to(args.input_dir).parent,
@@ -163,7 +177,8 @@ def _main(argv=None):
     from .workflows import run_batch, run_long
     if args.command == "batch":
         return run_batch(config, args.input_dir, args.output_dir, args.metrics_json)
-    return run_long(config, args.input, args.output_dir, args.segment_time, args.keep_temp, args.metrics_json)
+    return run_long(config, args.input, args.output_dir, args.segment_time, args.keep_temp, args.metrics_json,
+                    segment_frames=args.segment_frames, work_dir=args.work_dir, resume=args.resume)
 
 
 def main(argv=None):

@@ -16,7 +16,7 @@ jobs:
       - name: Install the pinned runtime and compile the bundled backend
         run: bash scripts/install.sh
       - name: Run real inference in full, tiny and tiny-long modes
-        run: python scripts/validate_gpu.py --output-dir results/gpu-validation
+        run: python scripts/validate_gpu.py --include-long --output-dir results/gpu-validation
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -21,7 +21,8 @@ flowchart TD
 | `flashvsr/cli.py`, `__main__.py` | Parse commands, configure logs, map failures to exit codes |
 | `flashvsr/config.py` | Immutable configuration, validation, output/report path rules |
 | `flashvsr/engine.py` | Preflight, model lifecycle, inference, output and metrics |
-| `flashvsr/workflows.py` | Recursive batches and keyframe-aligned segments using the same engine |
+| `flashvsr/workflows.py`, `long_video.py` | Recursive batches and resumable bounded long-video processing |
+| `flashvsr/jobs.py`, `streaming.py` | Locked atomic job records, integrity checks and backpressured FFmpeg decoding |
 | `flashvsr/frames.py` | Decode all frames, natural image order, bicubic resize, spatial/temporal padding |
 | `flashvsr/media.py` | FFmpeg/FFprobe version detection, NVENC probe and retry, all audio tracks, atomic verified output |
 | `flashvsr/models.py`, `assets/models.json` | Model versions, cache, pinned downloads and SHA-256 verification |
@@ -35,10 +36,12 @@ callers construct `InferenceConfig` and call `InferenceEngine(config).run(...)`.
 Argument parsing, model listing, checks and downloads work without importing
 PyTorch. Actual inference still requires the compiled sparse attention backend.
 
-Each input/segment gets a fresh pipeline and its own decoder/KV caches. This
-preserves isolation between clips and releases resources on failure. A batch
-reuses the engine, FFmpeg selection and model registry, but verifies and loads
-model parameters for each clip; GPU model pooling is not implemented.
+Standalone inputs and batch items get a fresh pipeline. Long jobs use an explicit
+`InferenceEngine.session()` to load one model lazily and retain weights and fixed
+prompt KV across segments. Projector, decoder and local attention masks are reset
+before and after every call. Per-call self-attention KV remains local to the
+pipeline invocation. A failed call discards the model; session exit releases it,
+including on interruption. Models are released before final video encoding.
 
 ## Retained DiffSynth dependencies
 
@@ -91,11 +94,10 @@ Downloads take a directory lock, stream to a unique `.part` file, verify size
 and digest, then atomically replace the target. An interrupted or corrupt
 download removes its partial file and leaves the existing target intact. A
 retry starts the file again; partial byte-range resumption is not implemented.
-Valid local files are reused without downloading. `models check` and every
-inference input hash all selected files, including batch items and long-video
-segments. This reads several GB per input; verification is not cached by file
-timestamps because a same-size rewrite can share the same timestamp on some
-filesystems. Checks are local and never trigger implicit downloads.
+Valid local files are reused without downloading. `models check`, standalone
+inputs and batch items hash all selected weights. Long jobs verify once at session
+entry before decoding; the verified in-memory weights are reused for that session.
+Every new process verifies again. Checks are local and never trigger downloads.
 
 Changing a model release requires adding a manifest version with independently
 verified digests and compatible architecture, updating loaders when necessary,
@@ -129,18 +131,37 @@ three B-frames, middle B references, 32-frame lookahead, spatial/temporal AQ
 and `yuv420p`. A 40-frame test encode with these exact settings runs before
 hardware encoding; a failure or unexpected output codec triggers libx264.
 AVI retains H.264 NVENC. Frame count, FPS, dimensions, codec, and audio checks
-stay strict across versions. Concatenated segments must also share a codec.
-Temporary segments are deleted in a
-`finally` block unless `--keep-temp` is set. Final media replaces an existing
+stay strict across versions. Long-job checkpoints use lossless RGB FFV1; the final
+encode streams a concat list and can replay it for software fallback without
+repeating inference. Checkpoints are retained on failure and deleted on success
+unless `--keep-temp` is set. Final media replaces an existing
 file only after verification. Failure reports may replace older reports to
 describe the latest attempt; media and JSON publication are separate operations.
 
-The frame preparation and pipeline algorithms preserve the previous spatial
-padding and 8n+1 temporal padding behavior. Output is cropped to the exact
+Frame preparation preallocates one tensor and fills it with batches of at most
+32 decoded frames. Spatial padding is unchanged; 8n+1 temporal alignment now
+includes 16 lookahead frames (minimum 25 total), so a short final segment can
+execute the streaming model. Output is cropped to the exact
 scaled resolution and trimmed to the original frame count. If a pipeline
 returns too few frames, the existing last-frame repeat policy remains and now
 emits a warning plus `generated_frames` in the report. Whole-clip preparation
 still uses memory proportional to clip length; use `flashvsr long` for large
 inputs. Segment boundaries may introduce visual discontinuities.
+
+Long jobs consume raw RGB frames sequentially from FFmpeg with pipe backpressure.
+The frame ceiling is independent of keyframes; VFR is normalized while preserving
+decoded frame order/count. Frame-based resume scans the prefix inside FFmpeg rather
+than approximate timestamp seeking. Only one segment buffer/tensor is processed
+at a time. Metadata and lossless disk checkpoints grow with segment count/duration.
+
+`job.json` uses atomic replacement and fsync under a nonblocking advisory file
+lock. It pins input content, model identity, runtime, processing revision, config
+and the frame plan. Completed cache entries require both SHA-256 and media checks.
+Only committed entries are reused after a crash; an interrupted segment restarts.
+The final file also has a content hash for idempotent completed resumes. Parameters
+or input changes require a new job directory. Keep `PROCESSING_REVISION` current
+when changing inference semantics. Long reports include frame offsets,
+`model_reused`, current-invocation model loads/processed/reused counts and peak VRAM
+across stored segment reports (including previous invocations).
 
 See [TESTING.md](TESTING.md) for CPU coverage and the separate real GPU gate.

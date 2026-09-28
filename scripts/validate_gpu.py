@@ -30,6 +30,7 @@ def _main(argv=None):
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--max-vram-gib', type=positive_float, help='Optional per-mode peak reserved-memory ceiling')
     parser.add_argument('--timeout', type=positive_float, default=1800, help='Seconds allowed per mode')
+    parser.add_argument('--include-long', action='store_true', help='Also validate bounded segments, model reuse and completed-job resume in every mode')
     args = parser.parse_args(argv)
     directory = args.output_dir.expanduser().resolve()
     directory.mkdir(parents=True, exist_ok=True)
@@ -86,7 +87,39 @@ def _main(argv=None):
                 raise RuntimeError(f'{mode} reported invalid GPU memory measurements: {allocated}, {reserved}')
             if args.max_vram_gib is not None and reserved > args.max_vram_gib * 1024**3:
                 raise RuntimeError(f'{mode} exceeded --max-vram-gib: {reserved / 1024**3:.2f} GiB')
-            result.update({'status': 'passed', 'metrics': metrics})
+            result['metrics'] = metrics
+            if args.include_long:
+                folder = run_dir / f'{mode}-long'
+                long_metrics = run_dir / f'{mode}-long.json'
+                long_log = run_dir / f'{mode}-long.log'
+                long_command = [sys.executable, '-m', 'flashvsr', 'long', '-i', str(source), '-o', str(folder),
+                                '--mode', mode, '--scale', '2.0', '--device', args.device, '--keep-audio',
+                                '--tile-dit', '--segment-frames', '9', '--keep-temp', '--metrics-json', str(long_metrics)]
+                if mode == 'full':
+                    long_command.append('--tile-vae')
+                with long_log.open('w') as log:
+                    subprocess.run(long_command, cwd=PROJECT, stdout=log, stderr=subprocess.STDOUT,
+                                   timeout=args.timeout, check=True)
+                long_result = json.loads(long_metrics.read_text())
+                media.verify_video(folder / 'FlashVSR_input_Final.mp4', width=256, height=192,
+                                   frames=17, fps=8, audio_streams=1)
+                if (long_result['model_loads'] != 1 or long_result['segments_processed'] != 2 or
+                        [item['model_reused'] for item in long_result['runs']] != [False, True]):
+                    raise RuntimeError(f'{mode}: long job did not reuse one model for both segments')
+                for segment in long_result['runs']:
+                    allocated, reserved = segment['peak_allocated_bytes'], segment['peak_reserved_bytes']
+                    if not 0 < allocated <= reserved <= properties.total_memory:
+                        raise RuntimeError(f'{mode}: invalid long-job memory measurements')
+                    if args.max_vram_gib is not None and reserved > args.max_vram_gib * 1024**3:
+                        raise RuntimeError(f'{mode}: long job exceeded --max-vram-gib')
+                with long_log.open('a') as log:
+                    subprocess.run([*long_command, '--resume'], cwd=PROJECT, stdout=log, stderr=subprocess.STDOUT,
+                                   timeout=args.timeout, check=True)
+                resumed = json.loads(long_metrics.read_text())
+                if resumed['model_loads'] != 0 or resumed['segments_processed'] != 0 or resumed['segments_reused'] != 2:
+                    raise RuntimeError(f'{mode}: completed resume repeated inference')
+                result['long'] = {'metrics': long_result, 'resumed': resumed, 'log': str(long_log)}
+            result['status'] = 'passed'
             write_report(report_path, report)
         report['status'] = 'passed'
     except BaseException as error:
